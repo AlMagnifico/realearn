@@ -490,9 +490,20 @@ impl BackboneShell {
         } else {
             None
         };
-        // Detect shutdown via hidden child window as suggested by Justin
+        // Open a hidden child window to take care of a few things:
+        // - Shutdown detection (works only until REAPER 7.51, is replaced with "at_exit" hook in REAPER 7.55)
+        // - Playtime & toolbar timers (could probably be replaced with REAPER timers at some point, but as long
+        //   as we want to support REAPER <= 7.51, there's no good reason to change that because we need the
+        //   hidden window anyway)
         let shutdown_detection_panel = SharedView::new(HiddenHelperPanel::new());
         shutdown_detection_panel.clone().open(reaper_main_window());
+        // For REAPER 7.55+, registering an at-exit hook will succeed
+        extern "C" fn at_exit() {
+            BackboneShell::get().shutdown();
+        }
+        let _ = Reaper::get()
+            .medium_session()
+            .plugin_register_add_at_exit(at_exit);
         BackboneShell {
             async_runtime: RefCell::new(Some(async_runtime)),
             _tracing_hook: tracing_hook,
@@ -651,18 +662,24 @@ impl BackboneShell {
             let middleware = control_surface.middleware_mut();
             middleware.shutdown();
         });
-        // It's important to wait a bit, otherwise we risk the MIDI is not being sent.
-        // We wait for 3 audio blocks, a maximum of 100 milliseconds. Justin's recommendation.
-        let initial_block_count = GLOBAL_AUDIO_STATE.load_block_count();
-        for _ in 0..100 {
-            std::thread::sleep(Duration::from_millis(1));
-            let elapsed_blocks = GLOBAL_AUDIO_STATE
-                .load_block_count()
-                .saturating_sub(initial_block_count);
-            if elapsed_blocks > 2 {
-                debug!("Waited a total of {elapsed_blocks} blocks after sending shutdown MIDI messages");
-                break;
-            }
+        sleep_for_a_few_audio_blocks();
+        if cfg!(target_os = "windows") {
+            // On Windows, we traditionally executed destroy hooks. Mainly because REAPER for
+            // Windows provides the preference "VST => Allow complete unload of VST plug-ins".
+            // On other OS, this option is not available. Therefore, cleaning up highly static
+            // resources is not really necessary or even possible.
+            // Well, even on Windows, lately "complete unload" leads to crashes. Not sure why.
+            // But anyway, we still try our best.
+            //
+            // We execute those hooks latest on DLL_PROCESS_DETACH.
+            // But executing the plug-in destroy hooks **here already** has the advantage that arbitrary tear-down
+            // code can be run. The code that can be called on Windows when dropping everything when the
+            // DLL gets detached is limited (if not following this rule, panics may occur and that
+            // would abort REAPER because the panic occurs in drop).
+            // Still, ideally, the tear-down code itself should be safe to execute on DLL_PROCESS_DETACH
+            // as well.
+            tracing::info!("Executing plug-in destroy hooks from hidden helper panel...");
+            reaper_low::execute_plugin_destroy_hooks();
         }
     }
 
@@ -820,6 +837,7 @@ impl BackboneShell {
             let control_surface = session
                 .plugin_register_remove_csurf_inst(awake_state.control_surface_handle)
                 .context("control surface was not registered")?;
+            sleep_for_a_few_audio_blocks();
             let audio_hook = session
                 .audio_reg_hardware_hook_remove(awake_state.audio_hook_handle)
                 .context("control surface was not registered")?;
@@ -3309,3 +3327,22 @@ async fn fetch_remote_config_internal(also_init_sentry: bool) -> anyhow::Result<
 }
 
 static HELGOBOX_REMOTE_CONFIG: OnceLock<HelgoboxRemoteConfig> = OnceLock::new();
+
+/// At project close or exit, it's important to wait a bit, otherwise we risk the MIDI is not being sent.
+///
+/// We wait for 3 audio blocks, a maximum of 100 milliseconds. Justin's recommendation.
+fn sleep_for_a_few_audio_blocks() {
+    let initial_block_count = GLOBAL_AUDIO_STATE.load_block_count();
+    for _ in 0..100 {
+        std::thread::sleep(Duration::from_millis(1));
+        let elapsed_blocks = GLOBAL_AUDIO_STATE
+            .load_block_count()
+            .saturating_sub(initial_block_count);
+        if elapsed_blocks > 2 {
+            debug!(
+                "Waited a total of {elapsed_blocks} blocks after sending shutdown MIDI messages"
+            );
+            break;
+        }
+    }
+}
