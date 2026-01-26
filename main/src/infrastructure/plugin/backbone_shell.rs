@@ -656,9 +656,11 @@ impl BackboneShell {
     /// already be closed. Opening them again - in a destructor - is not good practice.
     ///
     /// This should be called early in the REAPER shutdown procedure. At the moment, we call it when a hidden window
-    /// is destroyed.
+    /// is destroyed and additionally - in later REAPER versions - by a REAPER exit hook.
     pub fn shutdown(&self) {
-        self.temporarily_reclaim_control_surface_ownership(|control_surface| {
+        // In later REAPER versions with REAPER exit hooks, this can be called twice! To avoid a crash on exit,
+        // we should not panic if the following operation doesn't succeed.
+        let _ = self.temporarily_reclaim_control_surface_ownership(|control_surface| {
             let middleware = control_surface.middleware_mut();
             middleware.shutdown();
         });
@@ -698,7 +700,8 @@ impl BackboneShell {
                 .connect_all_enabled_inputs_and_outputs();
             middleware.set_osc_input_devices(osc_input_devices);
             processor.start(osc_output_devices);
-        });
+        })
+        .expect("should reconnect OSC devices");
     }
 
     fn create_services(&self) -> Services {
@@ -1009,7 +1012,7 @@ impl BackboneShell {
     fn temporarily_reclaim_control_surface_ownership<R>(
         &self,
         f: impl FnOnce(&mut RealearnControlSurface) -> R,
-    ) -> R {
+    ) -> anyhow::Result<R> {
         let (result, next_state) = match self.state.replace(AppState::Suspended) {
             AppState::Sleeping(mut s) => {
                 let result = f(&mut s.control_surface);
@@ -1020,14 +1023,14 @@ impl BackboneShell {
                 let mut control_surface = unsafe {
                     session
                         .plugin_register_remove_csurf_inst(s.control_surface_handle)
-                        .expect("control surface was not registered")
+                        .context("control surface was not registered")?
                 };
                 // Execute necessary operations
                 let result = f(&mut control_surface);
                 // Give it back to REAPER.
                 let control_surface_handle = session
                     .plugin_register_add_csurf_inst(control_surface)
-                    .expect("couldn't reregister ReaLearn control surface");
+                    .context("reregister ReaLearn control surface")?;
                 let awake_state = AwakeState {
                     control_surface_handle,
                     audio_hook_handle: s.audio_hook_handle,
@@ -1036,10 +1039,10 @@ impl BackboneShell {
                 };
                 (result, AppState::Awake(awake_state))
             }
-            _ => panic!("Backbone was neither in sleeping nor in awake state"),
+            _ => bail!("Backbone was neither in sleeping nor in awake state"),
         };
         self.state.replace(next_state);
-        result
+        Ok(result)
     }
 
     /// Spawns the given future on the Helgobox async runtime.
