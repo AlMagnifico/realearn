@@ -3,10 +3,13 @@ use anyhow::Context;
 use reaper_medium::Hbrush;
 use std::cell::{Cell, OnceCell, RefCell};
 use std::fmt::Debug;
+use std::rc::{Rc, Weak};
 use std::sync;
 use std::sync::Arc;
 
-use crate::application::SharedInstanceModel;
+use crate::application::{
+    Affected, InstanceModel, InstanceProp, InstanceUi, SharedInstanceModel, UnitProp, UnitUi,
+};
 use crate::domain::{InstanceId, UnitId};
 use crate::infrastructure::plugin::{
     reaper_main_window, BackboneShell, InstanceShell, SharedInstanceShell,
@@ -265,6 +268,36 @@ impl InstancePanel {
             .context("instance shell not yet set")?
             .upgrade()
             .context("instance shell gone")
+    }
+
+    fn handle_affected(
+        self: SharedView<Self>,
+        affected: Affected<InstanceProp>,
+        _initiator: Option<u32>,
+    ) -> anyhow::Result<()> {
+        let unit_panel = self
+            .displayed_unit_panel
+            .borrow()
+            .clone()
+            .context("get displayed unit panel")?;
+        match affected {
+            Affected::One(InstanceProp::Tags) => {
+                unit_panel.invalidate_instance_tags();
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+}
+
+impl InstanceUi for Weak<InstancePanel> {
+    fn handle_affected(
+        &self,
+        affected: Affected<InstanceProp>,
+        initiator: Option<u32>,
+    ) -> anyhow::Result<()> {
+        let panel = self.upgrade().context("instance panel gone")?;
+        panel.handle_affected(affected, initiator)
     }
 }
 

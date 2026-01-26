@@ -1118,7 +1118,9 @@ impl UnitModel {
         initiator: Option<u32>,
         weak_unit: WeakUnitModel,
     ) {
-        let _ = self.change_with_closure(initiator, weak_unit, |unit| unit.change(cmd));
+        if let Ok(Some(affected)) = self.change(cmd) {
+            self.handle_affected(affected, initiator, weak_unit);
+        }
     }
 
     /// Changes unit properties without notifying listeners.
@@ -1266,23 +1268,11 @@ impl UnitModel {
         );
     }
 
-    fn change_with_closure(
-        &mut self,
-        initiator: Option<u32>,
-        weak_unit: WeakUnitModel,
-        f: impl FnOnce(&mut UnitModel) -> ChangeResult<UnitProp>,
-    ) -> Result<(), String> {
-        if let Some(affected) = f(self)? {
-            self.handle_affected(affected, initiator, weak_unit);
-        }
-        Ok(())
-    }
-
     fn handle_affected(
         &self,
         affected: Affected<UnitProp>,
         initiator: Option<u32>,
-        weak_unit: WeakUnitModel,
+        weak_model: WeakUnitModel,
     ) {
         // We react in the next main loop cycle. First, because otherwise we can easily run into
         // BorrowMut errors (because the handler might borrow the unit, but we still have it
@@ -1294,7 +1284,7 @@ impl UnitModel {
         Global::task_support()
             .do_later_in_main_thread_from_main_thread_asap(move || {
                 // Internal reaction
-                let Some(unit) = weak_unit.upgrade() else {
+                let Some(model) = weak_model.upgrade() else {
                     // We panicked here before and that was sometimes popping up as an error. But
                     // if the unit doesn't exist anymore, then this is always a sign that the
                     // ReaLearn FX instance has been removed, which is fine. And whatever we
@@ -1305,34 +1295,34 @@ impl UnitModel {
                     use Affected::*;
                     use CompartmentProp::*;
                     use UnitProp::*;
-                    let mut unit = unit.borrow_mut();
+                    let mut model = model.borrow_mut();
                     match &affected {
                         One(
                             WantsKeyboardInput | StreamDeckDeviceId | MatchEvenInactiveMappings,
                         ) => {
-                            unit.sync_settings();
+                            model.sync_settings();
                         }
                         One(InCompartment(compartment, One(Notes))) => {
-                            unit.mark_compartment_dirty(*compartment);
+                            model.mark_compartment_dirty(*compartment);
                         }
                         One(InCompartment(compartment, One(CommonLua))) => {
-                            unit.sync_compartment_settings(*compartment);
-                            unit.mark_compartment_dirty(*compartment);
+                            model.sync_compartment_settings(*compartment);
+                            model.mark_compartment_dirty(*compartment);
                         }
                         One(InCompartment(compartment, One(InGroup(_, affected)))) => {
                             // Sync all mappings to processor if necessary (change of a single
                             // group can affect many mappings)
                             if affected.processing_relevance().is_some() {
-                                unit.sync_all_mappings_full(*compartment);
+                                model.sync_all_mappings_full(*compartment);
                             }
                             // Mark dirty
-                            unit.mark_compartment_dirty(*compartment);
+                            model.mark_compartment_dirty(*compartment);
                         }
                         One(InCompartment(compartment, One(InMapping(mapping_id, affected)))) => {
                             // Sync mapping to processors if necessary.
                             if let Some(relevance) = affected.processing_relevance() {
                                 if let Some(mapping) =
-                                    unit.find_mapping_by_id(*compartment, *mapping_id)
+                                    model.find_mapping_by_id(*compartment, *mapping_id)
                                 {
                                     let mapping = mapping.borrow();
                                     use ProcessingRelevance::*;
@@ -1340,17 +1330,18 @@ impl UnitModel {
                                         PersistentProcessingRelevant => {
                                             // Keep syncing persistent mapping processing state only
                                             // (must be cheap because can be triggered by processing).
-                                            unit.sync_persistent_mapping_processing_state(&mapping);
+                                            model
+                                                .sync_persistent_mapping_processing_state(&mapping);
                                         }
                                         ProcessingRelevant => {
                                             // Keep syncing complete mappings to processors.
-                                            unit.sync_single_mapping_to_processors(&mapping);
+                                            model.sync_single_mapping_to_processors(&mapping);
                                         }
                                     }
                                 }
                             }
                             // Mark dirty
-                            unit.mark_compartment_dirty(*compartment);
+                            model.mark_compartment_dirty(*compartment);
                         }
                         _ => {}
                     }
@@ -1361,7 +1352,7 @@ impl UnitModel {
                     // because we are just invalidating the UI. A UI reaction shouldn't
                     // need to borrow the unit mutably. In case it's going to be an issue,
                     // we can also choose to clone the weak main panel instead.
-                    let unit = unit.borrow();
+                    let unit = model.borrow();
                     unit.ui().handle_affected(&unit, affected, initiator);
                 }
             })

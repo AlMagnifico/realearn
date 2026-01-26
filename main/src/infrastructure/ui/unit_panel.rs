@@ -150,11 +150,11 @@ impl UnitPanel {
             );
             write!(&mut text, " | Instance ID: {instance_id}").expect("should never fail");
             if !instance_tags.is_empty() {
-                let _ = write!(&mut text, ", tags: {}", format_tags_as_csv(instance_tags));
+                let _ = write!(&mut text, " [{}]", format_tags_as_csv(instance_tags));
             }
-            write!(&mut text, " | | Unit key: {unit_key}").expect("should never fail");
+            write!(&mut text, " | Unit key: {unit_key}").expect("should never fail");
             if !unit_tags.is_empty() {
-                let _ = write!(&mut text, " , tags: {}", format_tags_as_csv(unit_tags));
+                let _ = write!(&mut text, " [{}]", format_tags_as_csv(unit_tags));
             }
             self.view
                 .require_control(root::ID_MAIN_PANEL_STATUS_1_TEXT)
@@ -218,6 +218,10 @@ impl UnitPanel {
             None => Err("session not available anymore"),
             Some(session) => Ok(f(&mut session.borrow_mut())),
         }
+    }
+
+    pub fn invalidate_instance_tags(&self) {
+        self.invalidate_status_1_text();
     }
 
     fn invalidate_all_controls(&self) {

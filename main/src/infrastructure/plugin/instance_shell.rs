@@ -130,7 +130,8 @@ impl InstanceShell {
         let rt_instance = Arc::new(Mutex::new(rt_instance));
         let instance_id = instance.id();
         let instance = Rc::new(RefCell::new(instance));
-        let instance_model = Rc::new(RefCell::new(InstanceModel::new(instance)));
+        let instance_model = InstanceModel::new(instance, Box::new(Rc::downgrade(&panel)));
+        let instance_model = Rc::new(RefCell::new(instance_model));
         let main_unit_shell = UnitShell::new(
             main_unit_id,
             Some("Main".into()),

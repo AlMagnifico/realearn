@@ -12,8 +12,9 @@ use swell_ui::{DeviceContext, Pixels, Point, SharedView, View, ViewContext, Weak
 use crate::application::{
     reaper_supports_global_midi_filter, Affected, AutoLoadMode, CompartmentCommand,
     CompartmentPresetManager, CompartmentPresetModel, CompartmentProp, FxId, FxPresetLinkConfig,
-    MakeFxNonStickyMode, MakeTrackNonStickyMode, MappingCommand, MappingModel, PresetLinkMutator,
-    SharedMapping, SharedUnitModel, UnitCommand, UnitProp, WeakUnitModel,
+    InstanceCommand, MakeFxNonStickyMode, MakeTrackNonStickyMode, MappingCommand, MappingModel,
+    PresetLinkMutator, SharedInstanceModel, SharedMapping, SharedUnitModel, UnitCommand, UnitProp,
+    WeakUnitModel,
 };
 use crate::base::when;
 use crate::domain::{
@@ -34,6 +35,7 @@ use crate::infrastructure::plugin::{
 use crate::infrastructure::ui::bindings::root;
 
 use crate::base::notification::{notify_processing_result, notify_user_about_anyhow_error};
+use crate::domain::ui_util::format_tags_as_csv;
 use crate::infrastructure::api::convert::from_data::ConversionStyle;
 use crate::infrastructure::api::convert::to_data;
 use crate::infrastructure::ui::color_panel::{ColorPanel, ColorPanelDesc};
@@ -49,7 +51,7 @@ use crate::infrastructure::ui::menus::{
 use crate::infrastructure::ui::stream_deck_tool::StreamDeckToolbarOptions;
 use crate::infrastructure::ui::util::{
     close_child_panel_if_open, colors, open_child_panel, open_child_panel_dyn, open_in_browser,
-    open_in_file_manager, view, HEADER_PANEL_SCALING,
+    open_in_file_manager, parse_tags_from_csv, view, HEADER_PANEL_SCALING,
 };
 use crate::infrastructure::ui::{
     add_firewall_rule, copy_text_to_clipboard, deserialize_api_object_from_lua,
@@ -140,6 +142,29 @@ impl HeaderPanel {
         self.open_extra_panel(editor);
     }
 
+    fn edit_instance_tags(&self) {
+        let instance_model = self.instance_model();
+        let initial_tags_as_csv = format_tags_as_csv(instance_model.borrow().tags());
+        // Show UI
+        let csv = Reaper::get().medium_reaper().get_user_inputs(
+            "ReaLearn",
+            1,
+            "Tags,separator=|,extrawidth=200",
+            initial_tags_as_csv,
+            1024,
+        );
+        // Check if cancelled
+        let Some(csv) = csv else {
+            return;
+        };
+        let tags = parse_tags_from_csv(csv.to_str());
+        instance_model.borrow_mut().change_with_notification(
+            InstanceCommand::SetTags(tags),
+            None,
+            Rc::downgrade(&instance_model),
+        );
+    }
+
     fn edit_compartment_common_lua(&self) {
         let compartment = self.active_compartment();
         let session = self.session();
@@ -219,6 +244,10 @@ impl HeaderPanel {
         if let Some(open_group_panel) = self.group_panel.borrow_mut().as_ref() {
             open_group_panel.handle_affected(affected, initiator);
         }
+    }
+
+    fn instance_model(&self) -> SharedInstanceModel {
+        self.session().borrow().instance_model().clone()
     }
 
     fn session(&self) -> SharedUnitModel {
@@ -744,6 +773,7 @@ impl HeaderPanel {
                         MainMenuAction::ToggleGlobalControl,
                     )],
                 ),
+                item("Instance tags...", MainMenuAction::EditInstanceTags),
                 item("Open Pot Browser", MainMenuAction::OpenPotBrowser),
                 item("Show App", MainMenuAction::ShowApp),
                 item_with_opts(
@@ -910,6 +940,7 @@ impl HeaderPanel {
             }
             MainMenuAction::ReloadAllCompartmentPresets => self.reload_all_compartment_presets(),
             MainMenuAction::EditCompartmentWideLuaCode => self.edit_compartment_common_lua(),
+            MainMenuAction::EditInstanceTags => self.edit_instance_tags(),
             MainMenuAction::OpenPotBrowser => {
                 self.show_pot_browser();
             }
@@ -3230,6 +3261,7 @@ enum MainMenuAction {
     LinkToPreset(PresetLinkScope, FxId, String),
     ReloadAllCompartmentPresets,
     OpenPotBrowser,
+    EditInstanceTags,
     ShowApp,
     CloseApp,
     OpenCompartmentPresetFolder,
