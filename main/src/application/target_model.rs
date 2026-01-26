@@ -3371,6 +3371,14 @@ impl Display for TargetModelFormatMultiLine<'_> {
                     | BrowseFxs | AllTrackFxEnable | TrackParentSend => {
                         write!(f, "{}\nTrack {}", tt, self.track_label())
                     }
+                    EnableInstances => {
+                        write!(
+                            f,
+                            "{tt}\n{}\n{}",
+                            self.target.instance_tag_kind(),
+                            format_tags_as_csv(&self.target.tags),
+                        )
+                    }
                     TrackAutomationMode => {
                         write!(
                             f,
