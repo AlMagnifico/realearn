@@ -54,7 +54,8 @@ impl MatrixHandler {
             let instance_shell = weak_instance_shell
                 .upgrade()
                 .context("instance shell gone")?;
-            let instance = instance_shell.instance().borrow();
+            let instance_model = instance_shell.model().borrow();
+            let instance = instance_model.instance().borrow();
             let matrix = instance.clip_matrix().context("no matrix")?;
             let column_count = matrix.column_count();
             let row_count = matrix.row_count();

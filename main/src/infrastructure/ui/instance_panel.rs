@@ -6,7 +6,8 @@ use std::fmt::Debug;
 use std::sync;
 use std::sync::Arc;
 
-use crate::domain::{InstanceId, SharedInstance, UnitId};
+use crate::application::SharedInstanceModel;
+use crate::domain::{InstanceId, UnitId};
 use crate::infrastructure::plugin::{
     reaper_main_window, BackboneShell, InstanceShell, SharedInstanceShell,
 };
@@ -251,8 +252,8 @@ impl InstancePanel {
     /// # Errors
     ///
     /// Returns an error if the instance shell is not set yet or gone.
-    pub fn instance(&self) -> anyhow::Result<SharedInstance> {
-        Ok(self.shell()?.instance().clone())
+    pub fn instance_model(&self) -> anyhow::Result<SharedInstanceModel> {
+        Ok(self.shell()?.model().clone())
     }
 
     /// # Errors

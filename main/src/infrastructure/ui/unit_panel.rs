@@ -139,17 +139,22 @@ impl UnitPanel {
         let _ = self.do_with_session(|unit_model| {
             let state = self.state.borrow();
             let scroll_status = state.scroll_status.get_ref();
-            let tags = unit_model.tags();
+            let unit_tags = unit_model.tags();
+            let instance_model = unit_model.instance_model().borrow();
+            let instance_tags = instance_model.tags();
             let instance_id = unit_model.instance_id();
             let unit_key = unit_model.unit_key();
             let mut text = format!(
-                "Showing mappings {} to {} of {} | Instance ID: {instance_id} | Unit key: {unit_key}",
-                scroll_status.from_pos,
-                scroll_status.to_pos,
-                scroll_status.item_count,
+                "Showing mappings {} to {} of {}",
+                scroll_status.from_pos, scroll_status.to_pos, scroll_status.item_count,
             );
-            if !tags.is_empty() {
-                let _ = write!(&mut text, " | Unit tags: {}", format_tags_as_csv(tags));
+            write!(&mut text, " | Instance ID: {instance_id}").expect("should never fail");
+            if !instance_tags.is_empty() {
+                let _ = write!(&mut text, ", tags: {}", format_tags_as_csv(instance_tags));
+            }
+            write!(&mut text, " | | Unit key: {unit_key}").expect("should never fail");
+            if !unit_tags.is_empty() {
+                let _ = write!(&mut text, " , tags: {}", format_tags_as_csv(unit_tags));
             }
             self.view
                 .require_control(root::ID_MAIN_PANEL_STATUS_1_TEXT)

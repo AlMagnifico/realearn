@@ -682,7 +682,8 @@ impl ProtoRequestHandler {
         request: GetCustomInstanceDataRequest,
     ) -> Result<Response<GetCustomInstanceDataReply>, Status> {
         self.handle_instance_command_internal(request.instance_id, |instance| {
-            let instance = instance.instance().borrow();
+            let instance_model = instance.model().borrow();
+            let instance = instance_model.instance().borrow();
             let data = instance.custom_data().get(&request.custom_key);
             let reply = GetCustomInstanceDataReply {
                 data: if let Some(d) = data {
@@ -700,9 +701,13 @@ impl ProtoRequestHandler {
         request: SetCustomInstanceDataRequest,
     ) -> Result<Response<Empty>, Status> {
         self.handle_instance_command(request.instance_id, |instance| {
-            let mut instance = instance.instance().borrow_mut();
             let value = serde_json::from_str(&request.custom_data)?;
-            instance.update_custom_data_key(request.custom_key, value);
+            instance
+                .model()
+                .borrow()
+                .instance()
+                .borrow_mut()
+                .update_custom_data_key(request.custom_key, value);
             Ok(())
         })
     }

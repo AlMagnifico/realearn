@@ -1,3 +1,6 @@
+mod instance_model;
+pub use instance_model::*;
+
 mod unit_model;
 pub use unit_model::*;
 
@@ -40,6 +43,7 @@ pub use props::*;
 mod auto_units;
 
 mod actions;
+
 pub use actions::*;
 
 pub use auto_units::*;

@@ -1,7 +1,9 @@
-use crate::application::{AutoUnitData, SharedUnitModel};
+use crate::application::{
+    AutoUnitData, InstanceCommand, InstanceModel, SharedInstanceModel, SharedUnitModel,
+};
 use crate::domain::{
     ControlEvent, IncomingMidiMessage, Instance, InstanceHandler, InstanceId, MidiEvent,
-    ProcessorContext, SharedInstance, SharedRealTimeInstance, UnitId,
+    ProcessorContext, SharedRealTimeInstance, UnitId,
 };
 use crate::infrastructure::data::{InstanceData, UnitData};
 use crate::infrastructure::plugin::unit_shell::UnitShell;
@@ -34,11 +36,12 @@ pub type WeakInstanceShell = sync::Weak<InstanceShell>;
 /// This was previously simply a part of the `RealearnPlugin` struct.
 #[derive(Debug)]
 pub struct InstanceShell {
+    /// A non-persistent counting ID. Must be unique.
+    instance_id: InstanceId,
+    model: Fragile<SharedInstanceModel>,
     panel: Fragile<SharedView<InstancePanel>>,
     // TODO-low Not too cool that we need to make this fragile. Related to reaper-high cells.
     processor_context: Fragile<ProcessorContext>,
-    instance_id: InstanceId,
-    instance: Fragile<SharedInstance>,
     rt_instance: SharedRealTimeInstance,
     main_unit_shell: UnitShell,
     settings: Fragile<RefCell<InstanceSettings>>,
@@ -127,19 +130,20 @@ impl InstanceShell {
         let rt_instance = Arc::new(Mutex::new(rt_instance));
         let instance_id = instance.id();
         let instance = Rc::new(RefCell::new(instance));
+        let instance_model = Rc::new(RefCell::new(InstanceModel::new(instance)));
         let main_unit_shell = UnitShell::new(
             main_unit_id,
             Some("Main".into()),
             instance_id,
             processor_context.clone(),
-            instance.clone(),
+            instance_model.clone(),
             Arc::downgrade(&rt_instance),
             SharedView::downgrade(&panel),
             true,
             None,
         );
         Self {
-            instance: Fragile::new(instance),
+            model: Fragile::new(instance_model),
             rt_instance: rt_instance.clone(),
             main_unit_shell,
             settings: Default::default(),
@@ -178,8 +182,8 @@ impl InstanceShell {
         self.instance_id
     }
 
-    pub fn instance(&self) -> &SharedInstance {
-        self.instance.get()
+    pub fn model(&self) -> &SharedInstanceModel {
+        self.model.get()
     }
 
     pub fn main_unit_shell(&self) -> &UnitShell {
@@ -269,7 +273,7 @@ impl InstanceShell {
             initial_name,
             self.instance_id,
             self.processor_context.get().clone(),
-            self.instance.get().clone(),
+            self.model.get().clone(),
             Arc::downgrade(&self.rt_instance),
             SharedView::downgrade(self.panel.get()),
             false,
@@ -284,8 +288,8 @@ impl InstanceShell {
             .proto_hub()
             .notify_instance_units_changed(self);
         #[cfg(feature = "playtime")]
-        if let Some(m) = self.instance().borrow().clip_matrix() {
-            m.notify_control_units_changed();
+        if let Some(matrix) = self.model.get().borrow().instance().borrow().clip_matrix() {
+            matrix.notify_control_units_changed();
         }
         for unit_shell in blocking_read_lock(&self.additional_unit_shells, "add_unit").iter() {
             unit_shell.panel().notify_units_changed();
@@ -442,7 +446,13 @@ impl InstanceShell {
 
     fn has_feature(&self, feature: &str) -> bool {
         match feature {
-            instance_features::PLAYTIME => self.instance.get().borrow().has_clip_matrix(),
+            instance_features::PLAYTIME => self
+                .model
+                .get()
+                .borrow()
+                .instance()
+                .borrow()
+                .has_clip_matrix(),
             _ => false,
         }
     }
@@ -469,9 +479,13 @@ impl InstanceShell {
             }
             additional_unit_datas
         };
-        let instance = self
-            .instance
+        let instance_model = self
+            .model
             .get()
+            .try_borrow()
+            .context("couldn't borrow instance model")?;
+        let instance = instance_model
+            .instance()
             .try_borrow()
             .context("couldn't borrow instance")?;
         let unit_model = self
@@ -480,6 +494,7 @@ impl InstanceShell {
             .try_borrow()
             .context("couldn't borrow main unit model")?;
         let data = InstanceData {
+            tags: instance_model.tags().to_vec(),
             main_unit: UnitData::from_model(&unit_model),
             additional_units: additional_unit_datas,
             settings: self.settings.get().borrow().clone(),
@@ -529,7 +544,9 @@ impl InstanceShell {
         self: SharedInstanceShell,
         instance_data: InstanceData,
     ) -> anyhow::Result<()> {
-        let instance = self.instance();
+        let mut instance_model = self.model.get().borrow_mut();
+        let _ = instance_model.change(InstanceCommand::SetTags(instance_data.tags));
+        let instance = instance_model.instance();
         // General properties
         *self.settings.get().borrow_mut() = instance_data.settings;
         // Pot state
@@ -544,7 +561,8 @@ impl InstanceShell {
         #[cfg(feature = "playtime")]
         {
             if let Some(m) = instance_data.clip_matrix {
-                let mut instance = self.instance().borrow_mut();
+                let instance_model = self.model.get().borrow();
+                let mut instance = instance_model.instance().borrow_mut();
                 self.clone()
                     .get_or_insert_owned_clip_matrix(&mut instance)?
                     .load(m)?;
@@ -636,7 +654,8 @@ impl InstanceShell {
         }
         #[cfg(feature = "playtime")]
         {
-            let mut instance = self.instance.get().borrow_mut();
+            let instance_model = self.model.get().borrow();
+            let mut instance = instance_model.instance().borrow_mut();
             if instance.clip_matrix().is_some() {
                 return Ok(());
             }
@@ -661,7 +680,8 @@ impl InstanceShell {
         }
         #[cfg(feature = "playtime")]
         {
-            let mut instance = self.instance().borrow_mut();
+            let instance_model = self.model().borrow();
+            let mut instance = instance_model.instance().borrow_mut();
             if let Some(matrix) = matrix {
                 self.clone()
                     .get_or_insert_owned_clip_matrix(&mut instance)?

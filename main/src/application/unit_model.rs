@@ -3,8 +3,8 @@ use crate::application::{
     ChangeResult, CompartmentCommand, CompartmentModel, CompartmentPresetManager,
     CompartmentPresetModel, CompartmentProp, FxId, FxPresetLinkConfig, GroupCommand, GroupModel,
     MappingCommand, MappingModel, MappingProp, ModeCommand, PresetLinkManager, ProcessingRelevance,
-    SharedGroup, SharedMapping, SourceModel, TargetCategory, TargetModel, TargetProp,
-    MASTER_TRACK_LABEL,
+    SharedGroup, SharedInstanceModel, SharedMapping, SourceModel, TargetCategory, TargetModel,
+    TargetProp, MASTER_TRACK_LABEL,
 };
 use crate::base::{notification, prop, when, AsyncNotifier, Prop};
 use crate::domain::{
@@ -145,6 +145,8 @@ pub struct UnitModel {
     unit_preset_link_config: FxPresetLinkConfig,
     use_unit_preset_links_only: bool,
     // It's okay not to use Weak here because the instance lives longer than the unit.
+    instance_model: SharedInstanceModel,
+    // It's okay not to use Weak here because the instance lives longer than the unit.
     instance: SharedInstance,
     unit: SharedUnit,
     global_feedback_audio_hook_task_sender: &'static SenderToRealTimeThread<FeedbackAudioHookTask>,
@@ -233,7 +235,7 @@ impl UnitModel {
         controller_manager: impl CompartmentPresetManager + 'static,
         main_preset_manager: impl CompartmentPresetManager + 'static,
         preset_link_manager: impl PresetLinkManager + 'static,
-        instance: SharedInstance,
+        instance_model: SharedInstanceModel,
         unit: SharedUnit,
         global_feedback_audio_hook_task_sender: &'static SenderToRealTimeThread<
             FeedbackAudioHookTask,
@@ -254,6 +256,7 @@ impl UnitModel {
             .as_ref()
             .map(|au| au.controller_id.clone())
             .unwrap_or_else(|| nanoid::nanoid!(8));
+        let instance = instance_model.borrow().instance().clone();
         let mut model = Self {
             unit_key: initial_unit_key,
             instance_id,
@@ -313,6 +316,7 @@ impl UnitModel {
             global_preset_link_manager: Box::new(preset_link_manager),
             unit_preset_link_config: Default::default(),
             use_unit_preset_links_only: false,
+            instance_model,
             instance,
             unit,
             global_feedback_audio_hook_task_sender,
@@ -414,6 +418,7 @@ impl UnitModel {
         &self.instance_fx_descriptor
     }
 
+    /// Returns all unit tags.
     pub fn tags(&self) -> &[Tag] {
         &self.tags
     }
@@ -2678,6 +2683,10 @@ impl UnitModel {
         let main_mapping = m.create_main_mapping(group_data);
         self.normal_main_task_sender
             .send_complaining(NormalMainTask::UpdateSingleMapping(Box::new(main_mapping)));
+    }
+
+    pub fn instance_model(&self) -> &SharedInstanceModel {
+        &self.instance_model
     }
 
     pub fn instance(&self) -> &SharedInstance {

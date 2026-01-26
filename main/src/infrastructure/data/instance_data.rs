@@ -1,3 +1,4 @@
+use crate::domain::Tag;
 use crate::infrastructure::data::UnitData;
 use anyhow::Context;
 use base::default_util::{deserialize_null_default, is_default};
@@ -10,6 +11,12 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "camelCase")]
 pub struct InstanceData {
     pub main_unit: UnitData,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_null_default",
+        skip_serializing_if = "is_default"
+    )]
+    pub tags: Vec<Tag>,
     pub additional_units: Vec<UnitData>,
     #[serde(
         default,
@@ -80,6 +87,7 @@ fn convert_old_unit_to_instance_data(mut d: UnitData) -> InstanceData {
         clip_matrix: d.clip_matrix.take(),
         main_unit: d,
         additional_units: vec![],
+        tags: vec![],
         settings: Default::default(),
         custom_data: Default::default(),
     }

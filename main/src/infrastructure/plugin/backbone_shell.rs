@@ -1517,7 +1517,8 @@ impl BackboneShell {
 
     pub fn register_instance(&self, instance_shell: &SharedInstanceShell) {
         debug!("Registering new instance...");
-        let instance = Rc::downgrade(instance_shell.instance());
+        let instance_model = instance_shell.model();
+        let instance = Rc::downgrade(instance_model.borrow().instance());
         let instance_id = instance_shell.instance_id();
         let rt_instance = instance_shell.rt_instance();
         let info = InstanceShellInfo {
@@ -1527,7 +1528,6 @@ impl BackboneShell {
             instance: instance.clone(),
         };
         self.instance_shell_infos.borrow_mut().push(info);
-        let instance = Rc::downgrade(instance_shell.instance());
         Backbone::get().register_instance(instance_id, instance.clone());
         self.audio_hook_task_sender
             .send_complaining(NormalAudioHookTask::AddRealTimeInstance(

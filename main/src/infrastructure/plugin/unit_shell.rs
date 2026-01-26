@@ -2,8 +2,8 @@ use vst::plugin::HostCallback;
 
 use crate::domain::{
     ControlEvent, IncomingMidiMessage, InstanceId, MainProcessor, MidiEvent, ParameterManager,
-    ProcessorContext, RealTimeProcessorLocker, SharedInstance, SharedRealTimeProcessor, Unit,
-    UnitId, WeakRealTimeInstance,
+    ProcessorContext, RealTimeProcessorLocker, SharedRealTimeProcessor, Unit, UnitId,
+    WeakRealTimeInstance,
 };
 use crate::domain::{NormalRealTimeTask, RealTimeProcessor};
 use crate::infrastructure::plugin::UnitInfo;
@@ -20,7 +20,7 @@ use std::sync::{Arc, Mutex};
 use swell_ui::{SharedView, WeakView};
 use tracing::debug;
 
-use crate::application::{AutoUnitData, SharedUnitModel, UnitModel};
+use crate::application::{AutoUnitData, SharedInstanceModel, SharedUnitModel, UnitModel};
 use crate::infrastructure::plugin::backbone_shell::BackboneShell;
 
 use crate::infrastructure::data::UnitData;
@@ -38,8 +38,7 @@ const PARAMETER_MAIN_TASK_QUEUE_SIZE: usize = 20_000;
 
 #[derive(Debug)]
 pub struct UnitShell {
-    /// An ID which is randomly generated on each start and is most relevant for log correlation.
-    /// It's also used in other ReaLearn singletons. Must be unique.
+    /// A non-persistent counting ID. Must be unique.
     id: UnitId,
     /// Fragile because we can't access this from any other thread than the main thread.
     model: Fragile<SharedUnitModel>,
@@ -61,8 +60,8 @@ impl UnitShell {
         initial_name: Option<String>,
         instance_id: InstanceId,
         processor_context: ProcessorContext,
-        parent_instance: SharedInstance,
-        parent_rt_instance: WeakRealTimeInstance,
+        instance_model: SharedInstanceModel,
+        rt_instance: WeakRealTimeInstance,
         instance_panel: WeakView<InstancePanel>,
         is_main_unit: bool,
         auto_unit: Option<AutoUnitData>,
@@ -97,7 +96,7 @@ impl UnitShell {
             );
         let real_time_processor = RealTimeProcessor::new(
             unit_id,
-            parent_rt_instance,
+            rt_instance,
             normal_real_time_task_receiver,
             feedback_real_time_task_receiver,
             feedback_real_time_task_sender.clone(),
@@ -115,10 +114,11 @@ impl UnitShell {
         let (unit_feedback_event_sender, unit_feedback_event_receiver) =
             SenderToNormalThread::new_unbounded_channel("unit state change events");
         let parameter_manager = ParameterManager::new(parameter_main_task_sender);
+        let instance = instance_model.borrow().instance().clone();
         let unit = Unit::new(
             unit_id,
             is_main_unit,
-            Rc::downgrade(&parent_instance),
+            Rc::downgrade(&instance),
             unit_feedback_event_sender,
             parameter_manager,
         );
@@ -134,7 +134,7 @@ impl UnitShell {
             BackboneShell::get().controller_preset_manager().clone(),
             BackboneShell::get().main_preset_manager().clone(),
             BackboneShell::get().preset_link_manager(),
-            parent_instance.clone(),
+            instance_model.clone(),
             unit.clone(),
             BackboneShell::get().feedback_audio_hook_task_sender(),
             feedback_real_time_task_sender.clone(),
@@ -149,6 +149,18 @@ impl UnitShell {
             .borrow_mut()
             .set_ui(Rc::downgrade(&unit_panel));
         keep_informing_clients_about_session_events(&shared_unit_model);
+        // TODO-high-playtime-refactoring We should register this like the instance - one layer higher and only
+        //  by passing the UnitShell (the root for everything unit-related).
+        let unit_info = UnitInfo {
+            unit_id,
+            instance_id,
+            instance: Rc::downgrade(&instance),
+            unit_model: weak_session.clone(),
+            instance_panel,
+            is_main_unit,
+            unit: Rc::downgrade(&unit),
+            is_auto_unit,
+        };
         // Main processor - (domain, owned by REAPER control surface)
         // Register the main processor with the global ReaLearn control surface. We let it
         // call by the control surface because it must be called regularly,
@@ -173,22 +185,10 @@ impl UnitShell {
             BackboneShell::get().osc_feedback_task_sender().clone(),
             weak_session.clone(),
             processor_context.clone(),
-            parent_instance.clone(),
+            instance,
             unit.clone(),
             BackboneShell::get(),
         );
-        // TODO-high-playtime-refactoring We should register this like the instance - one layer higher and only
-        //  by passing the UnitShell (the root for everything unit-related).
-        let unit_info = UnitInfo {
-            unit_id,
-            instance_id,
-            instance: Rc::downgrade(&parent_instance),
-            unit_model: weak_session.clone(),
-            instance_panel,
-            is_main_unit,
-            unit: Rc::downgrade(&unit),
-            is_auto_unit,
-        };
         BackboneShell::get().register_unit(unit_info, real_time_processor.clone(), main_processor);
         shared_unit_model
             .borrow_mut()
