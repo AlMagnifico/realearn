@@ -246,8 +246,7 @@ impl HelgoboxInstances {
                             id: info.instance_id.into(),
                             key: main_unit_model.unit_key().to_string(),
                             tags: main_unit_model
-                                .tags
-                                .get_ref()
+                                .tags()
                                 .iter()
                                 .map(|t| t.to_string())
                                 .collect(),

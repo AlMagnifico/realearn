@@ -1545,7 +1545,7 @@ impl BackboneShell {
         self.instance_shell_infos
             .borrow_mut()
             .retain(|i| i.instance_id != instance_id);
-        self.temporarily_reclaim_control_surface_ownership(|control_surface| {
+        let _ = self.temporarily_reclaim_control_surface_ownership(|control_surface| {
             // Remove main processor.
             control_surface
                 .middleware_mut()
@@ -2263,7 +2263,7 @@ impl BackboneShell {
                         continue;
                     }
                     // Skip unmatched tags.
-                    let session_tags = session.tags.get_ref();
+                    let session_tags = session.tags();
                     if !common_args.scope.any_tag_matches(session_tags) {
                         continue;
                     }
@@ -2749,7 +2749,7 @@ impl UnitContainer for BackboneShell {
                     continue;
                 }
                 // Determine how to change the instances.
-                let session_tags = session.tags.get_ref();
+                let session_tags = session.tags();
                 let flag = match args.common.scope.determine_enable_disable_change(
                     args.exclusivity,
                     session_tags,

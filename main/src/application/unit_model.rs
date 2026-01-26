@@ -110,7 +110,8 @@ pub struct UnitModel {
     pub auto_load_fallback_preset_id: Option<String>,
     // --
     pub lives_on_upper_floor: Prop<bool>,
-    pub tags: Prop<Vec<Tag>>,
+    /// Unit tags
+    tags: Vec<Tag>,
     pub compartment_is_dirty: EnumMap<CompartmentKind, Prop<bool>>,
     // Is set when in the state of learning multiple mappings ("batch learn")
     learn_many_state: Prop<Option<LearnManyState>>,
@@ -414,6 +415,10 @@ impl UnitModel {
 
     pub fn instance_fx_descriptor(&self) -> &FxDescriptor {
         &self.instance_fx_descriptor
+    }
+
+    pub fn tags(&self) -> &[Tag] {
+        &self.tags
     }
 
     /// Returns whether this unit allows the given global auto unit to be created (not necessarily
@@ -1114,6 +1119,7 @@ impl UnitModel {
         let _ = self.change_with_closure(initiator, weak_session, |session| session.change(cmd));
     }
 
+    /// Changes unit properties without notifying listeners.
     pub fn change(&mut self, cmd: SessionCommand) -> ChangeResult<SessionProp> {
         use Affected::*;
         use SessionCommand as C;
@@ -1126,6 +1132,10 @@ impl UnitModel {
             C::SetUnitKey(unit_key) => {
                 self.unit_key = unit_key;
                 Some(One(SessionProp::UnitKey))
+            }
+            C::SetUnitTags(tags) => {
+                self.tags = tags;
+                Some(One(SessionProp::UnitTags))
             }
             C::SetInstanceTrack(api_desc) => {
                 let virtual_track =
@@ -3066,6 +3076,7 @@ pub fn reaper_supports_global_midi_filter() -> bool {
 pub enum SessionCommand {
     SetUnitName(Option<String>),
     SetUnitKey(String),
+    SetUnitTags(Vec<Tag>),
     SetInstanceTrack(TrackDescriptor),
     SetInstanceFx(FxDescriptor),
     SetWantsKeyboardInput(bool),
@@ -3078,6 +3089,7 @@ pub enum SessionCommand {
 pub enum SessionProp {
     UnitName,
     UnitKey,
+    UnitTags,
     InstanceTrack,
     InstanceFx,
     WantsKeyboardInput,

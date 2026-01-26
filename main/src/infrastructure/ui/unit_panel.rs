@@ -139,7 +139,7 @@ impl UnitPanel {
         let _ = self.do_with_session(|unit_model| {
             let state = self.state.borrow();
             let scroll_status = state.scroll_status.get_ref();
-            let tags = unit_model.tags.get_ref();
+            let tags = unit_model.tags();
             let instance_id = unit_model.instance_id();
             let unit_key = unit_model.unit_key();
             let mut text = format!(
@@ -363,6 +363,7 @@ impl UnitPanel {
                 BackboneShell::get().proto_hub().notify_instances_changed();
                 send_sessions_to_subscribed_clients();
             }
+            One(UnitTags) => self.invalidate_status_1_text(),
             _ => {}
         }
         // Handle only if open
@@ -424,7 +425,7 @@ impl UnitPanel {
             (
                 session.unit_key().to_owned(),
                 session.name().map(|n| n.to_string()).unwrap_or_default(),
-                format_tags_as_csv(session.tags.get_ref()),
+                format_tags_as_csv(session.tags()),
             )
         })?;
         let initial_csv = format!("{initial_key}|{initial_name}|{initial_tags_as_csv}");
@@ -452,7 +453,11 @@ impl UnitPanel {
         if tags_as_csv != &initial_tags_as_csv {
             let tags = parse_tags_from_csv(tags_as_csv);
             self.do_with_session_mut(|session| {
-                session.tags.set(tags);
+                session.change_with_notification(
+                    SessionCommand::SetUnitTags(tags),
+                    None,
+                    self.unit_model.clone(),
+                );
             })?;
         }
         // Take care of unit name

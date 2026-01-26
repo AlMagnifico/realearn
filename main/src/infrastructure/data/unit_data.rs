@@ -557,7 +557,7 @@ impl UnitData {
                 CompartmentKind::Controller,
             ),
             clip_matrix: None,
-            tags: session.tags.get_ref().clone(),
+            tags: session.tags().to_vec(),
             controller: CompartmentState::from_instance_state(&unit, CompartmentKind::Controller),
             main: CompartmentState::from_instance_state(&unit, CompartmentKind::Main),
             active_instance_tags: unit.active_instance_tags().clone(),
@@ -846,7 +846,7 @@ impl UnitData {
         session
             .auto_load_mode
             .set_without_notification(self.main_preset_auto_load_mode);
-        session.tags.set_without_notification(self.tags.clone());
+        let _ = session.change(SessionCommand::SetUnitTags(self.tags.clone()));
         session.set_instance_preset_link_config(self.instance_preset_link_config.clone());
         session.set_use_unit_preset_links_only(self.use_instance_preset_links_only);
         if let Some(id) = &self.id {
