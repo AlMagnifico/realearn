@@ -545,9 +545,11 @@ impl InstanceShell {
         self: SharedInstanceShell,
         instance_data: InstanceData,
     ) -> anyhow::Result<()> {
-        let mut instance_model = self.model.get().borrow_mut();
-        let _ = instance_model.change(InstanceCommand::SetTags(instance_data.tags));
-        let instance = instance_model.instance();
+        let instance = {
+            let mut instance_model = self.model.get().borrow_mut();
+            let _ = instance_model.change(InstanceCommand::SetTags(instance_data.tags));
+            instance_model.instance().clone()
+        };
         // General properties
         *self.settings.get().borrow_mut() = instance_data.settings;
         // Pot state

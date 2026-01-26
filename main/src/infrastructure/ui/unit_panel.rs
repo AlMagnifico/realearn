@@ -153,9 +153,6 @@ impl UnitPanel {
                 let _ = write!(&mut text, " [{}]", format_tags_as_csv(instance_tags));
             }
             write!(&mut text, " | Unit key: {unit_key}").expect("should never fail");
-            if !unit_tags.is_empty() {
-                let _ = write!(&mut text, " [{}]", format_tags_as_csv(unit_tags));
-            }
             self.view
                 .require_control(root::ID_MAIN_PANEL_STATUS_1_TEXT)
                 .set_text(text.as_str());
@@ -665,6 +662,9 @@ fn build_unit_label_internal(
     }
     let label = unit_model.name_or_key();
     write!(&mut s, ": {label}")?;
+    if !unit_model.tags().is_empty() {
+        write!(&mut s, " [{}]", format_tags_as_csv(unit_model.tags()))?;
+    }
     Ok(s)
 }
 
