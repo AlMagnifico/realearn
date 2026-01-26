@@ -48,10 +48,10 @@ use crate::application::{
     MappingChangeContext, MappingCommand, MappingModel, MappingModificationKind, MappingProp,
     MappingRefModel, MappingSnapshotTypeForLoad, MappingSnapshotTypeForTake, MidiSourceType,
     ModeCommand, ModeModel, ModeProp, RealearnAutomationMode, RealearnTrackArea, ReaperSourceType,
-    SessionProp, SharedMapping, SharedUnitModel, SourceCategory, SourceCommand, SourceModel,
-    SourceProp, StreamDeckButtonBackgroundType, StreamDeckButtonForegroundType, TargetCategory,
-    TargetCommand, TargetModel, TargetModelFormatVeryShort, TargetModelWithContext, TargetProp,
-    TargetUnit, TrackRouteSelectorType, UnitModel, VirtualFxParameterType, VirtualFxType,
+    SharedMapping, SharedUnitModel, SourceCategory, SourceCommand, SourceModel, SourceProp,
+    StreamDeckButtonBackgroundType, StreamDeckButtonForegroundType, TargetCategory, TargetCommand,
+    TargetModel, TargetModelFormatVeryShort, TargetModelWithContext, TargetProp, TargetUnit,
+    TrackRouteSelectorType, UnitModel, UnitProp, VirtualFxParameterType, VirtualFxType,
     VirtualTrackType, WeakUnitModel, KEY_UNDEFINED_LABEL,
 };
 use crate::base::{notification, when, Prop};
@@ -193,12 +193,12 @@ impl MappingPanel {
 
     pub fn handle_affected(
         self: &SharedView<Self>,
-        affected: &Affected<SessionProp>,
+        affected: &Affected<UnitProp>,
         initiator: Option<u32>,
     ) {
         use Affected::*;
         use CompartmentProp::*;
-        use SessionProp::*;
+        use UnitProp::*;
         match affected {
             One(InCompartment(compartment, One(InMapping(mapping_id, affected))))
                 if Some(QualifiedMappingId::new(*compartment, *mapping_id))

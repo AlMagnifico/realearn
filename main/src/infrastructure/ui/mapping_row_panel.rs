@@ -1,7 +1,7 @@
 use crate::application::{
-    Affected, CompartmentProp, MappingCommand, MappingModel, MappingProp, SessionProp,
-    SharedMapping, SharedUnitModel, SourceCategory, TargetCategory, TargetModelFormatMultiLine,
-    UnitModel, WeakUnitModel,
+    Affected, CompartmentProp, MappingCommand, MappingModel, MappingProp, SharedMapping,
+    SharedUnitModel, SourceCategory, TargetCategory, TargetModelFormatMultiLine, UnitModel,
+    UnitProp, WeakUnitModel,
 };
 use crate::base::when;
 use crate::domain::{CompartmentKind, GroupId, GroupKey, MappingId, QualifiedMappingId};
@@ -79,12 +79,12 @@ impl MappingRowPanel {
         }
     }
 
-    pub fn handle_affected(&self, affected: &Affected<SessionProp>, _initiator: Option<u32>) {
+    pub fn handle_affected(&self, affected: &Affected<UnitProp>, _initiator: Option<u32>) {
         // If the reaction can't be displayed anymore because the mapping is not filled anymore,
         // so what.
         use Affected::*;
         use CompartmentProp::*;
-        use SessionProp::*;
+        use UnitProp::*;
         self.with_mapping(|_, m| {
             match affected {
                 One(InCompartment(compartment, One(InGroup(_, _))))
@@ -587,7 +587,7 @@ impl MappingRowPanel {
         let data_object = {
             let session = self.session();
             let session = session.borrow();
-            let compartment_in_session = session.compartment_in_session(active_compartment);
+            let compartment_in_session = session.compartment_in_unit(active_compartment);
             DataObject::try_from_api_object(api_object, &compartment_in_session)?
         };
         paste_data_object_in_place(data_object, self.session(), self.mapping_triple()?)?;
@@ -603,7 +603,7 @@ impl MappingRowPanel {
         let data_mappings = {
             let session = self.session();
             let session = session.borrow();
-            let compartment_in_session = session.compartment_in_session(active_compartment);
+            let compartment_in_session = session.compartment_in_unit(active_compartment);
             DataObject::try_from_api_mappings(api_mappings.value, &compartment_in_session)?
         };
         let triple = self.mapping_triple()?;
@@ -984,7 +984,7 @@ fn copy_mapping_object(
         .context("mapping not found")?;
     use ObjectType::*;
     let mapping = mapping.borrow();
-    let compartment_in_session = session.compartment_in_session(compartment);
+    let compartment_in_session = session.compartment_in_unit(compartment);
     let data_object = match object_type {
         Mapping => DataObject::Mapping(BackboneShell::create_envelope(Box::new(
             MappingModelData::from_model(&mapping, &compartment_in_session),
@@ -1045,7 +1045,7 @@ fn paste_data_object_in_place(
                     group.borrow().key().clone()
                 }
             };
-            let conversion_context = session.compartment_in_session(mapping.compartment());
+            let conversion_context = session.compartment_in_unit(mapping.compartment());
             // TODO-medium It would simplify things if we would just translate this into a new model
             //  and then call a Session method to completely replace a model by its ID. Same with
             //  other data object types.
@@ -1063,7 +1063,7 @@ fn paste_data_object_in_place(
             m.apply_to_model(&mut mapping.mode_model);
         }
         DataObject::Target(Envelope { value: t, .. }) => {
-            let compartment_in_session = session.compartment_in_session(triple.compartment);
+            let compartment_in_session = session.compartment_in_unit(triple.compartment);
             t.apply_to_model(
                 &mut mapping.target_model,
                 triple.compartment,
@@ -1072,7 +1072,7 @@ fn paste_data_object_in_place(
             )?;
         }
         DataObject::ActivationCondition(Envelope { value: c, .. }) => {
-            let compartment_in_session = session.compartment_in_session(triple.compartment);
+            let compartment_in_session = session.compartment_in_unit(triple.compartment);
             c.apply_to_model(
                 &mut mapping.activation_condition_model,
                 &compartment_in_session,
@@ -1122,7 +1122,7 @@ pub fn paste_mappings(
             data.group_id = group_key.clone();
             data.to_model(
                 compartment,
-                &session.compartment_in_session(compartment),
+                &session.compartment_in_unit(compartment),
                 Some(session.extended_context()),
                 mapping_datas.version.as_ref(),
             )

@@ -13,7 +13,7 @@ use crate::application::{
     reaper_supports_global_midi_filter, Affected, AutoLoadMode, CompartmentCommand,
     CompartmentPresetManager, CompartmentPresetModel, CompartmentProp, FxId, FxPresetLinkConfig,
     MakeFxNonStickyMode, MakeTrackNonStickyMode, MappingCommand, MappingModel, PresetLinkMutator,
-    SessionCommand, SessionProp, SharedMapping, SharedUnitModel, WeakUnitModel,
+    SharedMapping, SharedUnitModel, UnitCommand, UnitProp, WeakUnitModel,
 };
 use crate::base::when;
 use crate::domain::{
@@ -126,7 +126,7 @@ impl HeaderPanel {
                 let weak_session = weak_session.clone();
                 if let Some(session) = weak_session.upgrade() {
                     session.borrow_mut().change_with_notification(
-                        SessionCommand::ChangeCompartment(
+                        UnitCommand::ChangeCompartment(
                             compartment,
                             CompartmentCommand::SetNotes(edited_notes),
                         ),
@@ -156,7 +156,7 @@ impl HeaderPanel {
                 let weak_session = weak_session.clone();
                 if let Some(session) = weak_session.upgrade() {
                     session.borrow_mut().change_with_notification(
-                        SessionCommand::ChangeCompartment(
+                        UnitCommand::ChangeCompartment(
                             compartment,
                             CompartmentCommand::SetCommonLua(edited_notes),
                         ),
@@ -188,7 +188,7 @@ impl HeaderPanel {
         self.invalidate_feedback_output_button();
     }
 
-    pub fn handle_affected(&self, affected: &Affected<SessionProp>, initiator: Option<u32>) {
+    pub fn handle_affected(&self, affected: &Affected<UnitProp>, initiator: Option<u32>) {
         self.companion_app_presenter
             .handle_affected(affected, initiator);
         if !self.is_open() {
@@ -196,7 +196,7 @@ impl HeaderPanel {
         }
         use Affected::*;
         use CompartmentProp::*;
-        use SessionProp::*;
+        use UnitProp::*;
         match affected {
             One(WantsKeyboardInput) => {
                 self.invalidate_control_input_button();
@@ -1013,7 +1013,7 @@ impl HeaderPanel {
         let session = self.session();
         let session = session.borrow();
         let compartment = self.active_compartment();
-        let compartment_in_session = session.compartment_in_session(compartment);
+        let compartment_in_session = session.compartment_in_unit(compartment);
         let mapping_datas = self
             .get_listened_mappings(compartment)
             .iter()
@@ -1227,7 +1227,7 @@ impl HeaderPanel {
         let data_mappings = {
             let session = self.session();
             let session = session.borrow();
-            let compartment_in_session = session.compartment_in_session(active_compartment);
+            let compartment_in_session = session.compartment_in_unit(active_compartment);
             DataObject::try_from_api_mappings(api_mappings.value, &compartment_in_session)?
         };
         self.paste_replace_all_in_group(Envelope::new(api_mappings.version, data_mappings));
@@ -1260,7 +1260,7 @@ impl HeaderPanel {
                 data.group_id = group_key.clone();
                 data.to_model(
                     compartment,
-                    &session.compartment_in_session(compartment),
+                    &session.compartment_in_unit(compartment),
                     Some(session.extended_context()),
                     mapping_datas.version.as_ref(),
                 )
@@ -1451,7 +1451,7 @@ impl HeaderPanel {
             let mut session = session.borrow_mut();
             let current_value = session.match_even_inactive_mappings();
             session.change_with_notification(
-                SessionCommand::SetMatchEvenInactiveMappings(!current_value),
+                UnitCommand::SetMatchEvenInactiveMappings(!current_value),
                 None,
                 self.session.clone(),
             );
@@ -1851,7 +1851,7 @@ impl HeaderPanel {
                         let mut session = session.borrow_mut();
                         let current_value = session.wants_keyboard_input();
                         session.change_with_notification(
-                            SessionCommand::SetWantsKeyboardInput(!current_value),
+                            UnitCommand::SetWantsKeyboardInput(!current_value),
                             None,
                             self.session.clone(),
                         )
@@ -1860,7 +1860,7 @@ impl HeaderPanel {
                 ControlInputMenuAction::SelectStreamDeckDevice(dev) => {
                     if let Some(session) = self.session.clone().upgrade() {
                         session.borrow_mut().change_with_notification(
-                            SessionCommand::SetStreamDeckDevice(dev),
+                            UnitCommand::SetStreamDeckDevice(dev),
                             None,
                             self.session.clone(),
                         )
@@ -2077,7 +2077,7 @@ impl HeaderPanel {
         let res = {
             let session = self.session();
             let session = session.borrow();
-            let compartment_in_session = session.compartment_in_session(self.active_compartment());
+            let compartment_in_session = session.compartment_in_unit(self.active_compartment());
             deserialize_data_object(&text, &compartment_in_session)?
         };
         BackboneShell::warn_if_envelope_version_higher(res.version());

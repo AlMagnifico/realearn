@@ -1,4 +1,4 @@
-use crate::application::{CompartmentInSession, CompartmentModel, GroupModel, UnitModel};
+use crate::application::{CompartmentInUnit, CompartmentModel, GroupModel, UnitModel};
 use crate::domain::{
     CompartmentKind, CompartmentParamIndex, GroupId, GroupKey, MappingId, MappingKey, ParamSetting,
 };
@@ -115,7 +115,7 @@ impl CompartmentModelData {
         let conversion_context = SimpleDataToModelConversionContext::from_session_or_random(
             &self.groups,
             &self.mappings,
-            session.map(|s| CompartmentInSession::new(s, compartment)),
+            session.map(|s| CompartmentInUnit::new(s, compartment)),
         );
         let final_default_group = self
             .default_group

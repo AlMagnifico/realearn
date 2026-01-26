@@ -1,5 +1,5 @@
 use crate::application::{
-    Affected, CompartmentProp, GroupProp, SessionProp, WeakGroup, WeakUnitModel,
+    Affected, CompartmentProp, GroupProp, UnitProp, WeakGroup, WeakUnitModel,
 };
 use crate::infrastructure::ui::bindings::root;
 use crate::infrastructure::ui::util::MAPPING_PANEL_SCALING;
@@ -27,12 +27,12 @@ impl GroupPanel {
 
     pub fn handle_affected(
         self: &SharedView<Self>,
-        affected: &Affected<SessionProp>,
+        affected: &Affected<UnitProp>,
         initiator: Option<u32>,
     ) {
         use Affected::*;
         use CompartmentProp::*;
-        use SessionProp::*;
+        use UnitProp::*;
         match affected {
             One(InCompartment(_, One(InGroup(_, affected)))) => match affected {
                 Multiple => {

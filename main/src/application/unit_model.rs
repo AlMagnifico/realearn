@@ -50,15 +50,15 @@ use std::rc::{Rc, Weak};
 use std::{fmt, ptr};
 use tracing::{debug, trace};
 
-pub trait SessionUi {
+pub trait UnitUi {
     fn show_mapping(&self, compartment: CompartmentKind, mapping_id: MappingId);
     fn show_pot_browser(&self);
     fn target_value_changed(&self, event: TargetValueChangedEvent);
-    fn parameters_changed(&self, session: &UnitModel);
+    fn parameters_changed(&self, unit: &UnitModel);
     fn midi_devices_changed(&self);
     fn celebrate_success(&self);
     fn conditions_changed(&self);
-    fn send_projection_feedback(&self, session: &UnitModel, value: ProjectionFeedbackValue);
+    fn send_projection_feedback(&self, unit: &UnitModel, value: ProjectionFeedbackValue);
     fn mapping_matched(&self, event: MappingMatchedEvent);
     fn handle_target_control(&self, event: TargetControlEvent);
     fn handle_source_feedback(&self, event: SourceFeedbackEvent);
@@ -68,16 +68,13 @@ pub trait SessionUi {
     fn handle_global_control_and_feedback_state_changed(&self);
     fn handle_affected(
         &self,
-        session: &UnitModel,
-        affected: Affected<SessionProp>,
+        unit: &UnitModel,
+        affected: Affected<UnitProp>,
         initiator: Option<u32>,
     );
 }
 
-/// Just the old term as alias for easier class search.
-pub type _Session = UnitModel;
-
-/// This represents the user session with one ReaLearn instance.
+/// This represents the user unit with one ReaLearn instance.
 ///
 /// It's ReaLearn's main object which keeps everything together.
 #[derive(Derivative)]
@@ -87,7 +84,7 @@ pub struct UnitModel {
     unit_id: UnitId,
     /// Persisted and can be user-customized. Should be
     /// unique but if not it's not a big deal, then it won't crash but the user can't be sure which
-    /// session will be picked. Most relevant for HTTP/WS API.
+    /// unit will be picked. Most relevant for HTTP/WS API.
     unit_key: String,
     pub name: Option<String>,
     pub let_matched_events_through: Prop<bool>,
@@ -115,7 +112,7 @@ pub struct UnitModel {
     pub compartment_is_dirty: EnumMap<CompartmentKind, Prop<bool>>,
     // Is set when in the state of learning multiple mappings ("batch learn")
     learn_many_state: Prop<Option<LearnManyState>>,
-    // We want that learn works independently of the UI, so they are session properties.
+    // We want that learn works independently of the UI, so they are unit properties.
     active_controller_preset_id: Option<String>,
     active_main_preset_id: Option<String>,
     processor_context: ProcessorContext,
@@ -134,7 +131,7 @@ pub struct UnitModel {
     normal_main_task_sender: SenderToNormalThread<NormalMainTask>,
     party_is_over_subject: LocalSubject<'static, (), ()>,
     #[derivative(Debug = "ignore")]
-    ui: OnceCell<Box<dyn SessionUi>>,
+    ui: OnceCell<Box<dyn UnitUi>>,
     unit_container: &'static dyn UnitContainer,
     // TODO-medium I already made an attempt to remove this because we share parameters via
     //  Arc<ParameterManager> now. However, the extended_context() method borrows this and it's
@@ -203,7 +200,7 @@ impl LearnManyState {
     }
 }
 
-pub mod session_defaults {
+pub mod unit_defaults {
     use crate::application::AutoLoadMode;
     use crate::domain::StayActiveWhenProjectInBackground;
     use helgobox_api::persistence::FxDescriptor;
@@ -261,26 +258,26 @@ impl UnitModel {
             unit_key: initial_unit_key,
             instance_id,
             unit_id,
-            let_matched_events_through: prop(session_defaults::LET_MATCHED_EVENTS_THROUGH),
-            let_unmatched_events_through: prop(session_defaults::LET_UNMATCHED_EVENTS_THROUGH),
+            let_matched_events_through: prop(unit_defaults::LET_MATCHED_EVENTS_THROUGH),
+            let_unmatched_events_through: prop(unit_defaults::LET_UNMATCHED_EVENTS_THROUGH),
             stay_active_when_project_in_background: prop(
-                session_defaults::STAY_ACTIVE_WHEN_PROJECT_IN_BACKGROUND,
+                unit_defaults::STAY_ACTIVE_WHEN_PROJECT_IN_BACKGROUND,
             ),
             real_input_logging_enabled: prop(false),
             real_output_logging_enabled: prop(false),
             virtual_input_logging_enabled: prop(false),
             virtual_output_logging_enabled: prop(false),
             target_control_logging_enabled: prop(false),
-            send_feedback_only_if_armed: prop(session_defaults::SEND_FEEDBACK_ONLY_IF_ARMED),
+            send_feedback_only_if_armed: prop(unit_defaults::SEND_FEEDBACK_ONLY_IF_ARMED),
             reset_feedback_when_releasing_source: prop(
-                session_defaults::RESET_FEEDBACK_WHEN_RELEASING_SOURCE,
+                unit_defaults::RESET_FEEDBACK_WHEN_RELEASING_SOURCE,
             ),
             control_input: prop(initial_input),
-            wants_keyboard_input: session_defaults::WANTS_KEYBOARD_INPUT,
-            match_even_inactive_mappings: session_defaults::MATCH_EVEN_INACTIVE_MAPPINGS,
+            wants_keyboard_input: unit_defaults::WANTS_KEYBOARD_INPUT,
+            match_even_inactive_mappings: unit_defaults::MATCH_EVEN_INACTIVE_MAPPINGS,
             stream_deck_device_id: None,
             feedback_output: prop(initial_output),
-            auto_load_mode: prop(session_defaults::MAIN_PRESET_AUTO_LOAD_MODE),
+            auto_load_mode: prop(unit_defaults::MAIN_PRESET_AUTO_LOAD_MODE),
             auto_load_fallback_compartment: None,
             auto_load_fallback_preset_id: None,
             lives_on_upper_floor: prop(false),
@@ -323,7 +320,7 @@ impl UnitModel {
             global_osc_feedback_task_sender,
             control_surface_main_task_sender,
             instance_track_descriptor: Default::default(),
-            instance_fx_descriptor: session_defaults::INSTANCE_FX_DESCRIPTOR,
+            instance_fx_descriptor: unit_defaults::INSTANCE_FX_DESCRIPTOR,
             auto_unit: auto_unit.clone(),
             name: initial_name,
         };
@@ -391,7 +388,7 @@ impl UnitModel {
         self.auto_unit.replace(new_unit);
     }
 
-    pub fn set_ui(&mut self, ui: impl SessionUi + 'static) {
+    pub fn set_ui(&mut self, ui: impl UnitUi + 'static) {
         if self.ui.set(Box::new(ui)).is_err() {
             panic!("can set ui only once");
         }
@@ -569,47 +566,47 @@ impl UnitModel {
 
     /// Connects the dots.
     // TODO-low Too large. Split this into several methods.
-    pub fn activate(&mut self, weak_session: WeakUnitModel) {
+    pub fn activate(&mut self, weak_unit: WeakUnitModel) {
         // Initial sync
         self.full_sync();
         // Whenever something in the group list changes, resubscribe to those groups and sync
         // (because a mapping could have changed its group).
         when(self.group_list_changed())
-            .with(weak_session.clone())
-            .do_async(|shared_session, compartment| {
-                let mut session = shared_session.borrow_mut();
-                session.sync_all_mappings_full(compartment);
-                session.mark_compartment_dirty(compartment);
+            .with(weak_unit.clone())
+            .do_async(|shared_unit, compartment| {
+                let mut unit = shared_unit.borrow_mut();
+                unit.sync_all_mappings_full(compartment);
+                unit.mark_compartment_dirty(compartment);
             });
         // Whenever anything in a mapping list changes and other things which affect all
         // processors (including the real-time processor which takes care of sources only), resync
         // all mappings to *all* processors.
         when(self.mapping_list_changed())
-            .with(weak_session.clone())
-            .do_async(move |session, (compartment, _)| {
-                session.borrow_mut().sync_all_mappings_full(compartment);
+            .with(weak_unit.clone())
+            .do_async(move |unit, (compartment, _)| {
+                unit.borrow_mut().sync_all_mappings_full(compartment);
             });
         // Marking project as dirty if certain things are changed. Should only contain events that
         // are triggered by the user.
         when(self.settings_changed())
-            .with(weak_session.clone())
+            .with(weak_unit.clone())
             .do_sync(move |s, _| {
                 s.borrow().mark_dirty();
             });
         when(self.mapping_list_changed())
-            .with(weak_session.clone())
+            .with(weak_unit.clone())
             .do_sync(move |s, (compartment, _)| {
                 s.borrow_mut().mark_compartment_dirty(compartment);
             });
         // Keep adding/removing instance to/from upper floor.
         when(self.lives_on_upper_floor.changed())
-            .with(weak_session.clone())
+            .with(weak_unit.clone())
             .do_sync(move |s, _| {
                 s.borrow().sync_upper_floor_membership();
             });
         // Keep syncing some general settings to real-time processor.
         when(self.settings_changed())
-            .with(weak_session.clone())
+            .with(weak_unit.clone())
             .do_async(move |s, _| {
                 s.borrow().sync_settings();
             });
@@ -621,7 +618,7 @@ impl UnitModel {
                 // We have this explicit stop criteria because we listen to global REAPER events.
                 .take_until(self.party_is_over()),
         )
-        .with(weak_session)
+        .with(weak_unit)
         .do_async(|s, _| {
             s.borrow_mut()
                 .invalidate_fx_indexes_of_mapping_targets(Rc::downgrade(&s));
@@ -669,13 +666,13 @@ impl UnitModel {
             .find_preset_linked_to_fx(&fx_id)
     }
 
-    fn invalidate_fx_indexes_of_mapping_targets(&mut self, weak_session: WeakUnitModel) {
+    fn invalidate_fx_indexes_of_mapping_targets(&mut self, weak_unit: WeakUnitModel) {
         let ids: Vec<_> = self
             .all_mappings()
             .map(|m| m.borrow().qualified_id())
             .collect();
         for id in ids {
-            self.change_mapping_by_id_with_closure(id, None, weak_session.clone(), |ctx| {
+            self.change_mapping_by_id_with_closure(id, None, weak_unit.clone(), |ctx| {
                 let affected = ctx
                     .mapping
                     .target_model
@@ -837,7 +834,7 @@ impl UnitModel {
             })
     }
 
-    fn learn_target(&mut self, target: &ReaperTarget, weak_session: WeakUnitModel) {
+    fn learn_target(&mut self, target: &ReaperTarget, weak_unit: WeakUnitModel) {
         // Prevent learning targets from other project tabs (leads to weird effects, just think
         // about it)
         if let Some(p) = target.project() {
@@ -850,7 +847,7 @@ impl UnitModel {
             if let Some(mapping) = self.find_mapping_by_qualified_id(qualified_id).cloned() {
                 let mut mapping = mapping.borrow_mut();
                 let compartment = mapping.compartment();
-                self.change_target_with_closure(&mut mapping, None, weak_session, |ctx| {
+                self.change_target_with_closure(&mut mapping, None, weak_unit, |ctx| {
                     ctx.mapping.target_model.apply_from_target(
                         target,
                         ctx.extended_context,
@@ -985,14 +982,14 @@ impl UnitModel {
         compartment: CompartmentKind,
         mapping_ids: &[MappingId],
         group_id: GroupId,
-        weak_session: WeakUnitModel,
+        weak_unit: WeakUnitModel,
     ) -> anyhow::Result<()> {
         for mapping_id in mapping_ids.iter() {
             let id = QualifiedMappingId::new(compartment, *mapping_id);
-            self.change_mapping_from_session(
+            self.change_mapping_from_unit(
                 id,
                 MappingCommand::SetGroupId(group_id),
-                weak_session.clone(),
+                weak_unit.clone(),
             );
         }
         self.notify_group_list_changed(compartment);
@@ -1026,17 +1023,17 @@ impl UnitModel {
     ///
     /// Panics if mapping not found.
     pub fn change_mapping_from_ui_simple(
-        weak_session: WeakUnitModel,
+        weak_unit: WeakUnitModel,
         mapping: &mut MappingModel,
         cmd: MappingCommand,
         initiator: Option<u32>,
     ) {
-        let Some(session) = weak_session.upgrade() else {
-            // If session is gone, it doesn't matter anyway
+        let Some(unit) = weak_unit.upgrade() else {
+            // If unit is gone, it doesn't matter anyway
             return;
         };
-        let mut session = session.borrow_mut();
-        session.change_mapping_from_ui_expert(mapping, cmd, initiator, weak_session);
+        let mut unit = unit.borrow_mut();
+        unit.change_mapping_from_ui_expert(mapping, cmd, initiator, weak_unit);
     }
 
     pub fn change_mapping_from_ui_expert(
@@ -1044,27 +1041,27 @@ impl UnitModel {
         mapping: &mut MappingModel,
         cmd: MappingCommand,
         initiator: Option<u32>,
-        weak_session: WeakUnitModel,
+        weak_unit: WeakUnitModel,
     ) {
         if let Some(affected) = mapping.change(cmd) {
             use Affected::*;
-            let affected = One(SessionProp::InCompartment(
+            let affected = One(UnitProp::InCompartment(
                 mapping.compartment(),
                 One(CompartmentProp::InMapping(mapping.id(), affected)),
             ));
-            self.handle_affected(affected, initiator, weak_session);
+            self.handle_affected(affected, initiator, weak_unit);
         }
     }
 
     pub fn change_group_from_ui_simple(
-        weak_session: WeakUnitModel,
+        weak_unit: WeakUnitModel,
         group: &mut GroupModel,
         cmd: GroupCommand,
         initiator: Option<u32>,
     ) {
-        let session = weak_session.upgrade().expect("session gone");
-        let mut session = session.borrow_mut();
-        session.change_group_from_ui_expert(group, cmd, initiator, weak_session);
+        let unit = weak_unit.upgrade().expect("unit gone");
+        let mut unit = unit.borrow_mut();
+        unit.change_group_from_ui_expert(group, cmd, initiator, weak_unit);
     }
 
     pub fn change_group_from_ui_expert(
@@ -1072,15 +1069,15 @@ impl UnitModel {
         group: &mut GroupModel,
         cmd: GroupCommand,
         initiator: Option<u32>,
-        weak_session: WeakUnitModel,
+        weak_unit: WeakUnitModel,
     ) {
         if let Some(affected) = group.change(cmd) {
             use Affected::*;
-            let affected = One(SessionProp::InCompartment(
+            let affected = One(UnitProp::InCompartment(
                 group.compartment(),
                 One(CompartmentProp::InGroup(group.id(), affected)),
             ));
-            self.handle_affected(affected, initiator, weak_session);
+            self.handle_affected(affected, initiator, weak_unit);
         }
     }
 
@@ -1089,53 +1086,53 @@ impl UnitModel {
     /// # Panics
     ///
     /// Panics if mapping not found.
-    fn change_mapping_from_session(
+    fn change_mapping_from_unit(
         &mut self,
         id: QualifiedMappingId,
         val: MappingCommand,
-        weak_session: WeakUnitModel,
+        weak_unit: WeakUnitModel,
     ) {
         self.change_with_notification(
-            SessionCommand::ChangeCompartment(
+            UnitCommand::ChangeCompartment(
                 id.compartment,
                 CompartmentCommand::ChangeMapping(id.id, Box::new(val)),
             ),
             None,
-            weak_session,
+            weak_unit,
         );
     }
 
-    /// The gateway point to change something in the session just using commands, also deeply nested
+    /// The gateway point to change something in the unit just using commands, also deeply nested
     /// things such as target properties.
     ///
-    /// Reasoning: With this single point of entry for changing something in the session, we can
+    /// Reasoning: With this single point of entry for changing something in the unit, we can
     /// easily intercept certain changes, notify the UI and so on. Without magic and without rxRust!
     pub fn change_with_notification(
         &mut self,
-        cmd: SessionCommand,
+        cmd: UnitCommand,
         initiator: Option<u32>,
-        weak_session: WeakUnitModel,
+        weak_unit: WeakUnitModel,
     ) {
-        let _ = self.change_with_closure(initiator, weak_session, |session| session.change(cmd));
+        let _ = self.change_with_closure(initiator, weak_unit, |unit| unit.change(cmd));
     }
 
     /// Changes unit properties without notifying listeners.
-    pub fn change(&mut self, cmd: SessionCommand) -> ChangeResult<SessionProp> {
+    pub fn change(&mut self, cmd: UnitCommand) -> ChangeResult<UnitProp> {
         use Affected::*;
-        use SessionCommand as C;
-        use SessionProp as P;
+        use UnitCommand as C;
+        use UnitProp as P;
         let affected = match cmd {
             C::SetUnitName(unit_name) => {
                 self.name = unit_name;
-                Some(One(SessionProp::UnitName))
+                Some(One(UnitProp::UnitName))
             }
             C::SetUnitKey(unit_key) => {
                 self.unit_key = unit_key;
-                Some(One(SessionProp::UnitKey))
+                Some(One(UnitProp::UnitKey))
             }
             C::SetUnitTags(tags) => {
                 self.tags = tags;
-                Some(One(SessionProp::UnitTags))
+                Some(One(UnitProp::UnitTags))
             }
             C::SetInstanceTrack(api_desc) => {
                 let virtual_track =
@@ -1195,16 +1192,16 @@ impl UnitModel {
         &mut self,
         id: QualifiedMappingId,
         initiator: Option<u32>,
-        weak_session: WeakUnitModel,
+        weak_unit: WeakUnitModel,
         f: impl FnOnce(MappingChangeContext) -> ChangeResult<MappingProp>,
     ) -> Result<(), String> {
         use Affected::*;
-        use SessionProp as P;
+        use UnitProp as P;
         let affected = self
             .changing_mapping_by_id(id, f)?
             .map(|affected| One(P::InCompartment(id.compartment, affected)));
         if let Some(affected) = affected {
-            self.handle_affected(affected, initiator, weak_session);
+            self.handle_affected(affected, initiator, weak_unit);
         }
         Ok(())
     }
@@ -1213,10 +1210,10 @@ impl UnitModel {
         &mut self,
         mapping: &mut MappingModel,
         initiator: Option<u32>,
-        weak_session: WeakUnitModel,
+        weak_unit: WeakUnitModel,
         f: impl FnOnce(MappingChangeContext) -> Option<Affected<TargetProp>>,
     ) {
-        let _ = self.change_mapping_with_closure(mapping, initiator, weak_session, |ctx| {
+        let _ = self.change_mapping_with_closure(mapping, initiator, weak_unit, |ctx| {
             Ok(f(ctx).map(|affected| Affected::One(MappingProp::InTarget(affected))))
         });
     }
@@ -1225,16 +1222,16 @@ impl UnitModel {
         &mut self,
         mapping: &mut MappingModel,
         initiator: Option<u32>,
-        weak_session: WeakUnitModel,
+        weak_unit: WeakUnitModel,
         f: impl FnOnce(MappingChangeContext) -> ChangeResult<MappingProp>,
     ) -> Result<(), String> {
         use Affected::*;
-        use SessionProp as P;
+        use UnitProp as P;
         let affected = self
             .changing_mapping(mapping, f)?
             .map(|affected| One(P::InCompartment(mapping.compartment(), affected)));
         if let Some(affected) = affected {
-            self.handle_affected(affected, initiator, weak_session);
+            self.handle_affected(affected, initiator, weak_unit);
         }
         Ok(())
     }
@@ -1242,53 +1239,49 @@ impl UnitModel {
     pub fn notify_compartment_has_changed(
         &mut self,
         compartment: CompartmentKind,
-        weak_session: WeakUnitModel,
+        weak_unit: WeakUnitModel,
     ) {
         use Affected::*;
         self.handle_affected(
-            One(SessionProp::InCompartment(compartment, Multiple)),
+            One(UnitProp::InCompartment(compartment, Multiple)),
             None,
-            weak_session,
+            weak_unit,
         );
     }
 
-    pub fn notify_mapping_has_changed(
-        &mut self,
-        id: QualifiedMappingId,
-        weak_session: WeakUnitModel,
-    ) {
+    pub fn notify_mapping_has_changed(&mut self, id: QualifiedMappingId, weak_unit: WeakUnitModel) {
         use Affected::*;
         self.handle_affected(
-            One(SessionProp::InCompartment(
+            One(UnitProp::InCompartment(
                 id.compartment,
                 One(CompartmentProp::InMapping(id.id, Multiple)),
             )),
             None,
-            weak_session,
+            weak_unit,
         );
     }
 
     fn change_with_closure(
         &mut self,
         initiator: Option<u32>,
-        weak_session: WeakUnitModel,
-        f: impl FnOnce(&mut UnitModel) -> ChangeResult<SessionProp>,
+        weak_unit: WeakUnitModel,
+        f: impl FnOnce(&mut UnitModel) -> ChangeResult<UnitProp>,
     ) -> Result<(), String> {
         if let Some(affected) = f(self)? {
-            self.handle_affected(affected, initiator, weak_session);
+            self.handle_affected(affected, initiator, weak_unit);
         }
         Ok(())
     }
 
     fn handle_affected(
         &self,
-        affected: Affected<SessionProp>,
+        affected: Affected<UnitProp>,
         initiator: Option<u32>,
-        weak_session: WeakUnitModel,
+        weak_unit: WeakUnitModel,
     ) {
         // We react in the next main loop cycle. First, because otherwise we can easily run into
-        // BorrowMut errors (because the handler might borrow the session but we still have it
-        // borrowed at this point because this handler is called by the session). Second, because
+        // BorrowMut errors (because the handler might borrow the unit, but we still have it
+        // borrowed at this point because this handler is called by the unit). Second, because
         // deferring the reaction seems to result in a smoother user experience.
         //
         // Sending all affected properties to the next main loop cycle as one batch can improve
@@ -1296,9 +1289,9 @@ impl UnitModel {
         Global::task_support()
             .do_later_in_main_thread_from_main_thread_asap(move || {
                 // Internal reaction
-                let Some(session) = weak_session.upgrade() else {
+                let Some(unit) = weak_unit.upgrade() else {
                     // We panicked here before and that was sometimes popping up as an error. But
-                    // if the session doesn't exist anymore, then this is always a sign that the
+                    // if the unit doesn't exist anymore, then this is always a sign that the
                     // ReaLearn FX instance has been removed, which is fine. And whatever we
                     // want to do here then wouldn't matter anyway. So don't panic!
                     return;
@@ -1306,35 +1299,35 @@ impl UnitModel {
                 {
                     use Affected::*;
                     use CompartmentProp::*;
-                    use SessionProp::*;
-                    let mut session = session.borrow_mut();
+                    use UnitProp::*;
+                    let mut unit = unit.borrow_mut();
                     match &affected {
                         One(
                             WantsKeyboardInput | StreamDeckDeviceId | MatchEvenInactiveMappings,
                         ) => {
-                            session.sync_settings();
+                            unit.sync_settings();
                         }
                         One(InCompartment(compartment, One(Notes))) => {
-                            session.mark_compartment_dirty(*compartment);
+                            unit.mark_compartment_dirty(*compartment);
                         }
                         One(InCompartment(compartment, One(CommonLua))) => {
-                            session.sync_compartment_settings(*compartment);
-                            session.mark_compartment_dirty(*compartment);
+                            unit.sync_compartment_settings(*compartment);
+                            unit.mark_compartment_dirty(*compartment);
                         }
                         One(InCompartment(compartment, One(InGroup(_, affected)))) => {
                             // Sync all mappings to processor if necessary (change of a single
                             // group can affect many mappings)
                             if affected.processing_relevance().is_some() {
-                                session.sync_all_mappings_full(*compartment);
+                                unit.sync_all_mappings_full(*compartment);
                             }
                             // Mark dirty
-                            session.mark_compartment_dirty(*compartment);
+                            unit.mark_compartment_dirty(*compartment);
                         }
                         One(InCompartment(compartment, One(InMapping(mapping_id, affected)))) => {
                             // Sync mapping to processors if necessary.
                             if let Some(relevance) = affected.processing_relevance() {
                                 if let Some(mapping) =
-                                    session.find_mapping_by_id(*compartment, *mapping_id)
+                                    unit.find_mapping_by_id(*compartment, *mapping_id)
                                 {
                                     let mapping = mapping.borrow();
                                     use ProcessingRelevance::*;
@@ -1342,36 +1335,35 @@ impl UnitModel {
                                         PersistentProcessingRelevant => {
                                             // Keep syncing persistent mapping processing state only
                                             // (must be cheap because can be triggered by processing).
-                                            session
-                                                .sync_persistent_mapping_processing_state(&mapping);
+                                            unit.sync_persistent_mapping_processing_state(&mapping);
                                         }
                                         ProcessingRelevant => {
                                             // Keep syncing complete mappings to processors.
-                                            session.sync_single_mapping_to_processors(&mapping);
+                                            unit.sync_single_mapping_to_processors(&mapping);
                                         }
                                     }
                                 }
                             }
                             // Mark dirty
-                            session.mark_compartment_dirty(*compartment);
+                            unit.mark_compartment_dirty(*compartment);
                         }
                         _ => {}
                     }
                 }
                 // UI reaction
                 {
-                    // Borrowing the session while UI update shouldn't be an issue
+                    // Borrowing the unit while UI update shouldn't be an issue
                     // because we are just invalidating the UI. A UI reaction shouldn't
-                    // need to borrow the session mutably. In case it's going to be an issue,
+                    // need to borrow the unit mutably. In case it's going to be an issue,
                     // we can also choose to clone the weak main panel instead.
-                    let session = session.borrow();
-                    session.ui().handle_affected(&session, affected, initiator);
+                    let unit = unit.borrow();
+                    unit.ui().handle_affected(&unit, affected, initiator);
                 }
             })
             .unwrap();
     }
 
-    pub fn ui(&self) -> &dyn SessionUi {
+    pub fn ui(&self) -> &dyn UnitUi {
         &**(self.ui.get().expect("UI not yet set"))
     }
 
@@ -1425,9 +1417,9 @@ impl UnitModel {
             .map(|affected| One(CompartmentProp::InMapping(mapping.id(), affected))))
     }
 
-    pub fn compartment_in_session(&self, compartment: CompartmentKind) -> CompartmentInSession {
-        CompartmentInSession {
-            session: self,
+    pub fn compartment_in_unit(&self, compartment: CompartmentKind) -> CompartmentInUnit {
+        CompartmentInUnit {
+            unit: self,
             compartment,
         }
     }
@@ -1534,7 +1526,7 @@ impl UnitModel {
 
     pub fn start_learning_many_mappings(
         &mut self,
-        session: &SharedUnitModel,
+        unit: &SharedUnitModel,
         compartment: CompartmentKind,
         // Only relevant for main mapping compartment
         initial_group_id: GroupId,
@@ -1546,7 +1538,7 @@ impl UnitModel {
         self.stop_mapping_actions();
         // Add initial mapping and start learning its source
         self.add_and_learn_one_of_many_mappings(
-            session,
+            unit,
             compartment,
             initial_group_id,
             control_element_character,
@@ -1565,10 +1557,10 @@ impl UnitModel {
                 .changed_to(None)
                 .take_until(self.learn_many_state.changed_to(None)),
         )
-        .with(Rc::downgrade(session))
-        .do_async(move |session, _| {
-            session.borrow_mut().add_and_learn_one_of_many_mappings(
-                &session,
+        .with(Rc::downgrade(unit))
+        .do_async(move |unit, _| {
+            unit.borrow_mut().add_and_learn_one_of_many_mappings(
+                &unit,
                 compartment,
                 initial_group_id,
                 control_element_character,
@@ -1578,7 +1570,7 @@ impl UnitModel {
 
     fn add_and_learn_one_of_many_mappings(
         &mut self,
-        session: &SharedUnitModel,
+        unit: &SharedUnitModel,
         compartment: CompartmentKind,
         // Only relevant for main mapping compartment
         initial_group_id: GroupId,
@@ -1607,7 +1599,7 @@ impl UnitModel {
                 control_element_character,
             )));
         self.start_learning_source_internal(
-            Rc::downgrade(session),
+            Rc::downgrade(unit),
             qualified_mapping_id,
             false,
             ignore_sources,
@@ -1626,18 +1618,17 @@ impl UnitModel {
                     .take_until(self.learn_many_state.changed_to(None))
                     .take(1),
             )
-            .with(Rc::downgrade(session))
-            .do_async(move |shared_session, _| {
-                let mut session = shared_session.borrow_mut();
-                session
-                    .learn_many_state
+            .with(Rc::downgrade(unit))
+            .do_async(move |shared_unit, _| {
+                let mut unit = shared_unit.borrow_mut();
+                unit.learn_many_state
                     .set(Some(LearnManyState::learning_target(
                         compartment,
                         qualified_mapping_id.id,
                     )));
                 let filter = (ReaperTargetType::all(), TargetTouchCause::Reaper);
-                session.start_learning_target_internal(
-                    Rc::downgrade(&shared_session),
+                unit.start_learning_target_internal(
+                    Rc::downgrade(&shared_unit),
                     qualified_mapping_id,
                     false,
                     filter,
@@ -1763,7 +1754,7 @@ impl UnitModel {
 
     pub fn toggle_learning_source(
         &mut self,
-        session: WeakUnitModel,
+        unit: WeakUnitModel,
         mapping_id: QualifiedMappingId,
     ) -> anyhow::Result<()> {
         let currently_learning_mapping_id = self.unit.borrow().mapping_which_learns_source().get();
@@ -1773,12 +1764,12 @@ impl UnitModel {
                 return Ok(());
             }
         }
-        self.start_learning_source(session, mapping_id, vec![])
+        self.start_learning_source(unit, mapping_id, vec![])
     }
 
     fn start_learning_source(
         &mut self,
-        session: WeakUnitModel,
+        unit: WeakUnitModel,
         mapping_id: QualifiedMappingId,
         ignore_sources: Vec<CompoundMappingSource>,
     ) -> anyhow::Result<()> {
@@ -1795,12 +1786,12 @@ impl UnitModel {
                 .set_mapping_which_learns_source(Some(mapping_id));
             return Ok(());
         }
-        self.start_learning_source_internal(session, mapping_id, true, ignore_sources)
+        self.start_learning_source_internal(unit, mapping_id, true, ignore_sources)
     }
 
     fn start_learning_source_internal(
         &mut self,
-        session: WeakUnitModel,
+        unit: WeakUnitModel,
         mapping_id: QualifiedMappingId,
         reenable_control_after_touched: bool,
         ignore_sources: Vec<CompoundMappingSource>,
@@ -1858,24 +1849,21 @@ impl UnitModel {
                     .changed_to(None),
             ),
         )
-        .with(session)
-        .do_async(|shared_session, event: MessageCaptureEvent| {
-            let mut session = shared_session.borrow_mut();
-            let qualified_id = session.unit.borrow().mapping_which_learns_source().get();
+        .with(unit)
+        .do_async(|shared_unit, event: MessageCaptureEvent| {
+            let mut unit = shared_unit.borrow_mut();
+            let qualified_id = unit.unit.borrow().mapping_which_learns_source().get();
             if let Some(qualified_id) = qualified_id {
-                if let Some(source) = session.create_compound_source_for_learning(event) {
+                if let Some(source) = unit.create_compound_source_for_learning(event) {
                     // The learn process should stop when removing a mapping but just in case,
                     // let's react gracefully if the mapping doesn't exist anymore (do nothing).
-                    let _ = session.change_mapping_by_id_with_closure(
+                    let _ = unit.change_mapping_by_id_with_closure(
                         qualified_id,
                         None,
-                        Rc::downgrade(&shared_session),
+                        Rc::downgrade(&shared_unit),
                         |ctx| Ok(ctx.mapping.source_model.apply_from_source(&source)),
                     );
-                    session
-                        .unit
-                        .borrow_mut()
-                        .set_mapping_which_learns_source(None);
+                    unit.unit.borrow_mut().set_mapping_which_learns_source(None);
                 }
             }
         });
@@ -1886,11 +1874,7 @@ impl UnitModel {
         self.unit.borrow_mut().set_mapping_which_learns_source(None);
     }
 
-    pub fn toggle_learning_target(
-        &mut self,
-        session: WeakUnitModel,
-        mapping_id: QualifiedMappingId,
-    ) {
+    pub fn toggle_learning_target(&mut self, unit: WeakUnitModel, mapping_id: QualifiedMappingId) {
         let currently_learning_mapping_id = self.unit.borrow().mapping_which_learns_target().get();
         if let Some(id) = currently_learning_mapping_id {
             if id == mapping_id {
@@ -1899,7 +1883,7 @@ impl UnitModel {
             }
         }
         let filter = (ReaperTargetType::all(), TargetTouchCause::Reaper);
-        self.start_learning_target_internal(session, mapping_id, true, filter);
+        self.start_learning_target_internal(unit, mapping_id, true, filter);
     }
 
     /// Not setting `included_targets` means all targets are potentially included. This should
@@ -1907,7 +1891,7 @@ impl UnitModel {
     /// future.
     fn start_learning_target_internal(
         &mut self,
-        weak_session: WeakUnitModel,
+        weak_unit: WeakUnitModel,
         mapping_id: QualifiedMappingId,
         handle_control_disabling: bool,
         filter: (NonCryptoHashSet<ReaperTargetType>, TargetTouchCause),
@@ -1920,9 +1904,9 @@ impl UnitModel {
             .borrow_mut()
             .set_mapping_which_learns_target(Some(mapping_id));
         Global::future_support().spawn_in_main_thread_from_main_thread(async move {
-            let receiver = weak_session
+            let receiver = weak_unit
                 .upgrade()
-                .ok_or(SESSION_GONE)?
+                .ok_or(UNIT_GONE)?
                 .borrow()
                 .control_surface_main_task_sender
                 .capture_targets(Some(instance_id));
@@ -1934,10 +1918,10 @@ impl UnitModel {
                 if !filter.matches(&event) {
                     continue;
                 }
-                let session = weak_session.upgrade().ok_or(SESSION_GONE)?;
-                let mut session = session.borrow_mut();
-                session.learn_target(&event.target, weak_session.clone());
-                session.stop_learning_target();
+                let unit = weak_unit.upgrade().ok_or(UNIT_GONE)?;
+                let mut unit = unit.borrow_mut();
+                unit.learn_target(&event.target, weak_unit.clone());
+                unit.stop_learning_target();
             }
             Ok(())
         });
@@ -2370,13 +2354,13 @@ impl UnitModel {
             .parameter_manager()
             .update_compartment_params(compartment, compartment_params.clone());
         // We don't need to notify the UI because it will be done once the param container has
-        // propagated the changes to the session again via event (uni-directional dataflow).
+        // propagated the changes to the unit again via event (uni-directional dataflow).
         self.mark_compartment_dirty(compartment);
     }
 
     /// Fires if everything has changed. Supposed to be used by UI, should rerender everything.
     ///
-    /// The session itself shouldn't subscribe to this.
+    /// The unit itself shouldn't subscribe to this.
     pub fn everything_changed(
         &self,
     ) -> impl LocalObservable<'static, Item = (), Err = ()> + 'static {
@@ -2471,7 +2455,7 @@ impl UnitModel {
         // Summary
         let msg = format!(
             "\n\
-            # Session\n\
+            # Unit\n\
             \n\
             - Instance ID (random): {}\n\
             - ID (persistent, maybe custom): {}\n\
@@ -2495,7 +2479,7 @@ impl UnitModel {
         // Detailled
         trace!(
             "\n\
-            # Session\n\
+            # Unit\n\
             \n\
             {:#?}
             ",
@@ -2517,7 +2501,7 @@ impl UnitModel {
 
     pub fn toggle_learn_source_for_target(
         &mut self,
-        session: &SharedUnitModel,
+        unit: &SharedUnitModel,
         compartment: CompartmentKind,
         target: &ReaperTarget,
         toggle: bool,
@@ -2534,7 +2518,7 @@ impl UnitModel {
                     self.change_target_with_closure(
                         &mut mapping,
                         None,
-                        Rc::downgrade(session),
+                        Rc::downgrade(unit),
                         |ctx| {
                             if toggle {
                                 ctx.mapping.mode_model.change(ModeCommand::SetAbsoluteMode(
@@ -2553,7 +2537,7 @@ impl UnitModel {
             }
             Some(m) => m.clone(),
         };
-        self.toggle_learning_source(Rc::downgrade(session), mapping.borrow().qualified_id())
+        self.toggle_learning_source(Rc::downgrade(unit), mapping.borrow().qualified_id())
             .expect("error during toggle learn-source for target");
         mapping
     }
@@ -2800,7 +2784,7 @@ impl Display for UnitModel {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         let fx_pos = self.processor_context.containing_fx().index() + 1;
         let fx_name = self.processor_context.containing_fx().name();
-        let session_id = self.unit_key();
+        let unit_key = self.unit_key();
         if let Some(track) = self.processor_context.track() {
             if track.is_master_track() {
                 f.write_str(MASTER_TRACK_LABEL)?;
@@ -2816,106 +2800,101 @@ impl Display for UnitModel {
         } else {
             write!(f, "Monitoring FX chain")?;
         };
-        write!(f, " / \"{fx_pos}. {fx_name}\" (ID \"{session_id}\")")?;
+        write!(f, " / \"{fx_pos}. {fx_name}\" (ID \"{unit_key}\")")?;
         Ok(())
     }
 }
 
 impl DomainEventHandler for WeakUnitModel {
     fn handle_event(&self, event: DomainEvent) -> Result<(), Box<dyn Error>> {
-        let session = self.upgrade().ok_or("session not existing anymore")?;
+        let unit = self.upgrade().ok_or("unit not existing anymore")?;
         use DomainEvent::*;
         match event {
             Info(evt) => {
-                let s = session.try_borrow()?;
+                let s = unit.try_borrow()?;
                 s.ui().handle_internal_info_event(evt);
             }
             ConditionsChanged => {
-                let s = session.try_borrow()?;
+                let s = unit.try_borrow()?;
                 s.ui().conditions_changed()
             }
             TimeForCelebratingSuccess => {
-                let s = session.try_borrow()?;
+                let s = unit.try_borrow()?;
                 s.ui().celebrate_success()
             }
             CapturedIncomingMessage(event) => {
-                session.try_borrow_mut()?.captured_incoming_message(event);
+                unit.try_borrow_mut()?.captured_incoming_message(event);
             }
             UpdatedOnMappings(on_mappings) => {
-                session
-                    .try_borrow()?
+                unit.try_borrow()?
                     .unit
                     .try_borrow_mut()?
                     .set_on_mappings(on_mappings);
             }
             GlobalControlAndFeedbackStateChanged(state) => {
-                let session = session.try_borrow()?;
-                session
-                    .unit
+                let unit = unit.try_borrow()?;
+                unit.unit
                     .try_borrow_mut()?
                     .set_global_control_and_feedback_state(state);
-                session
-                    .ui()
-                    .handle_global_control_and_feedback_state_changed();
+                unit.ui().handle_global_control_and_feedback_state_changed();
             }
             UpdatedSingleMappingOnState(event) => {
-                session
-                    .try_borrow()?
+                unit.try_borrow()?
                     .unit
                     .try_borrow_mut()?
                     .set_mapping_on(event.id, event.is_on);
             }
             TargetValueChanged(e) => {
-                // If the session is borrowed already, just let it be. It happens only in a very
+                // If the unit is borrowed already, just let it be. It happens only in a very
                 // particular case of reentrancy (because of a quirk in REAPER related to master
                 // tempo notification, https://github.com/helgoboss/helgobox/issues/199). If the
                 // target value slider is not updated then ... so what.
-                session.try_borrow()?.ui().target_value_changed(e);
+                unit.try_borrow()?.ui().target_value_changed(e);
             }
             UpdatedSingleParameterValue { index, value } => {
-                let mut session = session.try_borrow_mut()?;
-                session.params.at_mut(index).set_raw_value(value);
-                session.ui().parameters_changed(&session);
+                let mut unit = unit.try_borrow_mut()?;
+                unit.params.at_mut(index).set_raw_value(value);
+                unit.ui().parameters_changed(&unit);
             }
             UpdatedAllParameters(params) => {
-                let mut session = session.try_borrow_mut()?;
-                session.params = params;
-                session.ui().parameters_changed(&session);
+                let mut unit = unit.try_borrow_mut()?;
+                unit.params = params;
+                unit.ui().parameters_changed(&unit);
             }
             FullResyncRequested => {
                 debug!("FullResyncRequested received");
-                session.try_borrow_mut()?.full_sync();
+                unit.try_borrow_mut()?.full_sync();
             }
             MidiDevicesChanged => {
-                session.try_borrow()?.ui().midi_devices_changed();
+                unit.try_borrow()?.ui().midi_devices_changed();
             }
             ProjectionFeedback(value) => {
-                let s = session.try_borrow()?;
+                let s = unit.try_borrow()?;
                 s.ui().send_projection_feedback(&s, value);
             }
             MappingMatched(event) => {
-                let s = session.try_borrow()?;
+                let s = unit.try_borrow()?;
                 s.ui().mapping_matched(event);
             }
             HandleTargetControl(event) => {
-                let s = session.try_borrow()?;
+                let s = unit.try_borrow()?;
                 s.ui().handle_target_control(event);
             }
             HandleSourceFeedback(event) => {
-                let s = session.try_borrow()?;
+                let s = unit.try_borrow()?;
                 s.ui().handle_source_feedback(event);
             }
             MappingEnabledChangeRequested(event) => {
-                let mut s = session.try_borrow_mut()?;
+                let mut s = unit.try_borrow_mut()?;
                 let id = QualifiedMappingId::new(event.compartment, event.mapping_id);
-                s.change_mapping_from_session(
+                s.change_mapping_from_unit(
                     id,
                     MappingCommand::SetIsEnabled(event.is_enabled),
                     self.clone(),
                 );
             }
             MappingModificationRequested(event) => {
-                let mut s = session.try_borrow_mut()?;
+                let mut s = unit.try_borrow_mut()?;
                 let id = QualifiedMappingId::new(event.compartment, event.mapping_id);
                 match event.modification {
                     MappingModification::LearnTarget(m) => {
@@ -2998,23 +2977,23 @@ impl DomainEventHandler for WeakUnitModel {
     }
 }
 
-/// Never store the strong reference to a session (except in the main owner RealearnPlugin)!
+/// Never store the strong reference to a unit (except in the main owner RealearnPlugin)!
 ///
 /// # Design
 ///
-/// ## Why `Rc<RefCell<Session>>`?
+/// ## Why `Rc<RefCell<UnitModel>>`?
 ///
 /// `Plugin#get_editor()` must return a Box of something 'static, so it's impossible to take a
 /// reference here. Why? Because a reference needs a lifetime. Any non-static lifetime would
 /// not satisfy the 'static requirement. Why not require a 'static reference then? Simply
-/// because we don't have a session object with static lifetime. The session object is
+/// because we don't have a unit object with static lifetime. The unit object is
 /// owned by the `Plugin` object, which itself doesn't have a static lifetime. The only way
-/// to get a 'static session would be to not let the plugin object own the session but to
+/// to get a 'static unit would be to not let the plugin object own the unit but to
 /// define a static global. This, however, would be a far worse design than just using a
 /// smart pointer here. So using a smart pointer is the best we can do really.
 ///
 /// This is not the only reason why taking a reference here is not feasible. During the
-/// lifecycle of a ReaLearn session we need mutable access to the session both from the
+/// lifecycle of a ReaLearn unit we need mutable access to the unit both from the
 /// editor (of course) and from the plugin (e.g. when REAPER wants us to load some data).
 /// When using references, Rust's borrow checker wouldn't let that happen. We can't do anything
 /// about this multiple-access requirement, it's just how the VST plugin API works (and
@@ -3024,7 +3003,7 @@ impl DomainEventHandler for WeakUnitModel {
 /// Fortunately, we know that actually both DAW-plugin interaction (such as loading data) and
 /// UI interaction happens in the main thread, in the so called main loop. So there's no
 /// need for using a thread-safe smart pointer here. We even can and also should satisfy
-/// the borrow checker, meaning that if the session is mutably accessed at a given point in
+/// the borrow checker, meaning that if the unit is mutably accessed at a given point in
 /// time, it is not accessed from another point as well. This can happen even in a
 /// single-threaded environment because functions can call other functions and thereby
 /// accessing the same data - just in different stack positions. Just think of reentrancy.
@@ -3043,8 +3022,8 @@ impl DomainEventHandler for WeakUnitModel {
 /// very  bad.  See https://github.com/RustAudio/vst-rs/issues/122
 pub type SharedUnitModel = Rc<RefCell<UnitModel>>;
 
-/// Always use this when storing a reference to a session. This avoids memory leaks and ghost
-/// sessions.
+/// Always use this when storing a reference to a unit. This avoids memory leaks and ghost
+/// units.
 pub type WeakUnitModel = Weak<RefCell<UnitModel>>;
 
 fn mappings_have_project_references<'a>(
@@ -3073,7 +3052,7 @@ pub fn reaper_supports_global_midi_filter() -> bool {
 }
 
 #[allow(dead_code)]
-pub enum SessionCommand {
+pub enum UnitCommand {
     SetUnitName(Option<String>),
     SetUnitKey(String),
     SetUnitTags(Vec<Tag>),
@@ -3086,7 +3065,7 @@ pub enum SessionCommand {
     AdjustMappingModeIfNecessary(QualifiedMappingId),
 }
 
-pub enum SessionProp {
+pub enum UnitProp {
     UnitName,
     UnitKey,
     UnitTags,
@@ -3099,17 +3078,14 @@ pub enum SessionProp {
 }
 
 #[derive(Copy, Clone)]
-pub struct CompartmentInSession<'a> {
-    pub session: &'a UnitModel,
+pub struct CompartmentInUnit<'a> {
+    pub unit: &'a UnitModel,
     pub compartment: CompartmentKind,
 }
 
-impl<'a> CompartmentInSession<'a> {
-    pub fn new(session: &'a UnitModel, compartment: CompartmentKind) -> Self {
-        Self {
-            session,
-            compartment,
-        }
+impl<'a> CompartmentInUnit<'a> {
+    pub fn new(unit: &'a UnitModel, compartment: CompartmentKind) -> Self {
+        Self { unit, compartment }
     }
 }
 
@@ -3150,7 +3126,7 @@ impl RealearnControlSurfaceMainTaskSender {
     }
 }
 
-const SESSION_GONE: &str = "session gone";
+const UNIT_GONE: &str = "unit gone";
 
 fn compile_common_lua(compartment: CompartmentKind, code: &str) -> anyhow::Result<mlua::Value> {
     let lua = unsafe { Backbone::main_thread_lua() };

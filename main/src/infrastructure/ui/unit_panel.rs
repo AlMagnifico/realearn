@@ -6,8 +6,8 @@ use crate::infrastructure::ui::{
 use reaper_high::Reaper;
 
 use crate::application::{
-    get_virtual_fx_label, get_virtual_track_label, Affected, CompartmentProp, SessionCommand,
-    SessionProp, SessionUi, UnitModel, VirtualFxType, WeakUnitModel,
+    get_virtual_fx_label, get_virtual_track_label, Affected, CompartmentProp, UnitCommand,
+    UnitModel, UnitProp, UnitUi, VirtualFxType, WeakUnitModel,
 };
 use crate::base::when;
 use crate::domain::ui_util::format_tags_as_csv;
@@ -316,7 +316,7 @@ impl UnitPanel {
 
     fn handle_affected(
         self: SharedView<Self>,
-        affected: Affected<SessionProp>,
+        affected: Affected<UnitProp>,
         initiator: Option<u32>,
     ) {
         self.panel_manager
@@ -345,9 +345,9 @@ impl UnitPanel {
             .notify_about_instance_info_event(self.instance_id, event);
     }
 
-    fn handle_affected_own(self: SharedView<Self>, affected: Affected<SessionProp>) {
+    fn handle_affected_own(self: SharedView<Self>, affected: Affected<UnitProp>) {
         use Affected::*;
-        use SessionProp::*;
+        use UnitProp::*;
         // Handle even if closed
         match affected {
             One(UnitName) => {
@@ -454,7 +454,7 @@ impl UnitPanel {
             let tags = parse_tags_from_csv(tags_as_csv);
             self.do_with_session_mut(|session| {
                 session.change_with_notification(
-                    SessionCommand::SetUnitTags(tags),
+                    UnitCommand::SetUnitTags(tags),
                     None,
                     self.unit_model.clone(),
                 );
@@ -468,7 +468,7 @@ impl UnitPanel {
         };
         self.do_with_session_mut(|session| {
             session.change_with_notification(
-                SessionCommand::SetUnitName(unit_name),
+                UnitCommand::SetUnitName(unit_name),
                 None,
                 self.unit_model.clone(),
             );
@@ -486,7 +486,7 @@ impl UnitPanel {
             }
             self.do_with_session_mut(|session| {
                 session.change_with_notification(
-                    SessionCommand::SetUnitKey(new_unit_key),
+                    UnitCommand::SetUnitKey(new_unit_key),
                     None,
                     self.unit_model.clone(),
                 );
@@ -538,7 +538,7 @@ impl View for UnitPanel {
     }
 }
 
-impl SessionUi for Weak<UnitPanel> {
+impl UnitUi for Weak<UnitPanel> {
     fn show_mapping(&self, compartment: CompartmentKind, mapping_id: MappingId) {
         upgrade_panel(self).edit_mapping(compartment, mapping_id);
     }
@@ -586,13 +586,13 @@ impl SessionUi for Weak<UnitPanel> {
     fn handle_affected(
         &self,
         session: &UnitModel,
-        affected: Affected<SessionProp>,
+        affected: Affected<UnitProp>,
         initiator: Option<u32>,
     ) {
         // Update secondary GUIs (e.g. Projection)
         use Affected::*;
         use CompartmentProp::*;
-        use SessionProp::*;
+        use UnitProp::*;
         match &affected {
             One(InCompartment(_, One(InMapping(_, _)))) => {
                 let _ = send_updated_controller_routing(session);

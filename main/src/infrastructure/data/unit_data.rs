@@ -1,7 +1,7 @@
 #![allow(deprecated)]
 use crate::application::{
-    reaper_supports_global_midi_filter, AutoLoadMode, CompartmentCommand, CompartmentInSession,
-    CompartmentModel, FxPresetLinkConfig, GroupModel, SessionCommand, SharedUnitModel, UnitModel,
+    reaper_supports_global_midi_filter, AutoLoadMode, CompartmentCommand, CompartmentInUnit,
+    CompartmentModel, FxPresetLinkConfig, GroupModel, SharedUnitModel, UnitCommand, UnitModel,
     WeakUnitModel,
 };
 use crate::domain::{
@@ -403,23 +403,23 @@ enum FeedbackDeviceId {
 impl Default for UnitData {
     #[allow(deprecated)]
     fn default() -> Self {
-        use crate::application::session_defaults;
+        use crate::application::unit_defaults;
         Self {
             version: Some(BackboneShell::version().clone()),
             id: None,
             name: None,
-            let_matched_events_through: session_defaults::LET_MATCHED_EVENTS_THROUGH,
-            let_unmatched_events_through: session_defaults::LET_UNMATCHED_EVENTS_THROUGH,
+            let_matched_events_through: unit_defaults::LET_MATCHED_EVENTS_THROUGH,
+            let_unmatched_events_through: unit_defaults::LET_UNMATCHED_EVENTS_THROUGH,
             stay_active_when_project_in_background: Some(
-                session_defaults::STAY_ACTIVE_WHEN_PROJECT_IN_BACKGROUND,
+                unit_defaults::STAY_ACTIVE_WHEN_PROJECT_IN_BACKGROUND,
             ),
-            lives_on_upper_floor: session_defaults::LIVES_ON_UPPER_FLOOR,
-            send_feedback_only_if_armed: session_defaults::SEND_FEEDBACK_ONLY_IF_ARMED,
+            lives_on_upper_floor: unit_defaults::LIVES_ON_UPPER_FLOOR,
+            send_feedback_only_if_armed: unit_defaults::SEND_FEEDBACK_ONLY_IF_ARMED,
             reset_feedback_when_releasing_source:
-                session_defaults::RESET_FEEDBACK_WHEN_RELEASING_SOURCE,
+                unit_defaults::RESET_FEEDBACK_WHEN_RELEASING_SOURCE,
             control_device_id: None,
-            wants_keyboard_input: session_defaults::WANTS_KEYBOARD_INPUT,
-            match_even_inactive_mappings: session_defaults::MATCH_EVEN_INACTIVE_MAPPINGS,
+            wants_keyboard_input: unit_defaults::WANTS_KEYBOARD_INPUT,
+            match_even_inactive_mappings: unit_defaults::MATCH_EVEN_INACTIVE_MAPPINGS,
             stream_deck_device_id: None,
             feedback_device_id: None,
             default_group: None,
@@ -436,7 +436,7 @@ impl Default for UnitData {
             main_notes: Default::default(),
             active_controller_id: None,
             active_main_preset_id: None,
-            main_preset_auto_load_mode: session_defaults::MAIN_PRESET_AUTO_LOAD_MODE,
+            main_preset_auto_load_mode: unit_defaults::MAIN_PRESET_AUTO_LOAD_MODE,
             parameters: Default::default(),
             controller_parameters: Default::default(),
             clip_matrix: None,
@@ -447,7 +447,7 @@ impl Default for UnitData {
             instance_preset_link_config: Default::default(),
             use_instance_preset_links_only: false,
             instance_track: Default::default(),
-            instance_fx: session_defaults::INSTANCE_FX_DESCRIPTOR,
+            instance_fx: unit_defaults::INSTANCE_FX_DESCRIPTOR,
             mapping_snapshots: vec![],
             controller_mapping_snapshots: vec![],
             pot_state: Default::default(),
@@ -461,7 +461,7 @@ impl UnitData {
     #[allow(deprecated)]
     pub fn from_model(session: &UnitModel) -> UnitData {
         let from_mappings = |compartment| {
-            let compartment_in_session = CompartmentInSession::new(session, compartment);
+            let compartment_in_session = CompartmentInUnit::new(session, compartment);
             session
                 .mappings(compartment)
                 .map(|m| MappingModelData::from_model(m.borrow().deref(), &compartment_in_session))
@@ -471,13 +471,13 @@ impl UnitData {
             session
                 .groups(compartment)
                 .map(|m| {
-                    let compartment_in_session = CompartmentInSession::new(session, compartment);
+                    let compartment_in_session = CompartmentInUnit::new(session, compartment);
                     GroupModelData::from_model(m.borrow().deref(), &compartment_in_session)
                 })
                 .collect()
         };
         let from_group = |compartment| {
-            let compartment_in_session = CompartmentInSession::new(session, compartment);
+            let compartment_in_session = CompartmentInUnit::new(session, compartment);
             let group_model_data = GroupModelData::from_model(
                 session.default_group(compartment).borrow().deref(),
                 &compartment_in_session,
@@ -627,7 +627,7 @@ impl UnitData {
         let main_conversion_context = SimpleDataToModelConversionContext::from_session_or_random(
             &self.groups,
             &self.mappings,
-            Some(CompartmentInSession::new(session, CompartmentKind::Main)),
+            Some(CompartmentInUnit::new(session, CompartmentKind::Main)),
         );
         ensure_no_duplicate_compartment_data(
             &self.mappings,
@@ -704,13 +704,11 @@ impl UnitData {
         session
             .feedback_output
             .set_without_notification(feedback_output);
-        let _ = session.change(SessionCommand::SetWantsKeyboardInput(
+        let _ = session.change(UnitCommand::SetWantsKeyboardInput(
             self.wants_keyboard_input || wants_keyboard_input_legacy,
         ));
-        let _ = session.change(SessionCommand::SetStreamDeckDevice(
-            self.stream_deck_device_id,
-        ));
-        let _ = session.change(SessionCommand::SetMatchEvenInactiveMappings(
+        let _ = session.change(UnitCommand::SetStreamDeckDevice(self.stream_deck_device_id));
+        let _ = session.change(UnitCommand::SetMatchEvenInactiveMappings(
             self.match_even_inactive_mappings,
         ));
         // Let events through or not
@@ -753,10 +751,7 @@ impl UnitData {
             SimpleDataToModelConversionContext::from_session_or_random(
                 &self.controller_groups,
                 &self.controller_mappings,
-                Some(CompartmentInSession::new(
-                    session,
-                    CompartmentKind::Controller,
-                )),
+                Some(CompartmentInUnit::new(session, CompartmentKind::Controller)),
             );
         let conversion_context = |compartment: CompartmentKind| match compartment {
             CompartmentKind::Controller => &controller_conversion_context,
@@ -825,19 +820,19 @@ impl UnitData {
             };
         apply_mappings(CompartmentKind::Main, &self.mappings)?;
         apply_mappings(CompartmentKind::Controller, &self.controller_mappings)?;
-        let _ = session.change(SessionCommand::ChangeCompartment(
+        let _ = session.change(UnitCommand::ChangeCompartment(
             CompartmentKind::Controller,
             CompartmentCommand::SetCommonLua(self.controller_common_lua.clone()),
         ));
-        let _ = session.change(SessionCommand::ChangeCompartment(
+        let _ = session.change(UnitCommand::ChangeCompartment(
             CompartmentKind::Main,
             CompartmentCommand::SetCommonLua(self.main_common_lua.clone()),
         ));
-        let _ = session.change(SessionCommand::ChangeCompartment(
+        let _ = session.change(UnitCommand::ChangeCompartment(
             CompartmentKind::Controller,
             CompartmentCommand::SetNotes(self.controller_notes.clone()),
         ));
-        let _ = session.change(SessionCommand::ChangeCompartment(
+        let _ = session.change(UnitCommand::ChangeCompartment(
             CompartmentKind::Main,
             CompartmentCommand::SetNotes(self.main_notes.clone()),
         ));
@@ -846,17 +841,15 @@ impl UnitData {
         session
             .auto_load_mode
             .set_without_notification(self.main_preset_auto_load_mode);
-        let _ = session.change(SessionCommand::SetUnitTags(self.tags.clone()));
+        let _ = session.change(UnitCommand::SetUnitTags(self.tags.clone()));
         session.set_instance_preset_link_config(self.instance_preset_link_config.clone());
         session.set_use_unit_preset_links_only(self.use_instance_preset_links_only);
         if let Some(id) = &self.id {
-            let _ = session.change(SessionCommand::SetUnitKey(id.clone()));
+            let _ = session.change(UnitCommand::SetUnitKey(id.clone()));
         };
-        let _ = session.change(SessionCommand::SetUnitName(self.name.clone()));
-        let _ = session.change(SessionCommand::SetInstanceTrack(
-            self.instance_track.clone(),
-        ));
-        let _ = session.change(SessionCommand::SetInstanceFx(self.instance_fx.clone()));
+        let _ = session.change(UnitCommand::SetUnitName(self.name.clone()));
+        let _ = session.change(UnitCommand::SetInstanceTrack(self.instance_track.clone()));
+        let _ = session.change(UnitCommand::SetInstanceFx(self.instance_fx.clone()));
         let (auto_load_fallback_preset_id, auto_load_fallback_compartment_model) =
             match &self.auto_load_fallback {
                 None => (None, None),
@@ -965,39 +958,37 @@ fn get_parameter_data_map(
         .collect()
 }
 
-impl ModelToDataConversionContext for CompartmentInSession<'_> {
+impl ModelToDataConversionContext for CompartmentInUnit<'_> {
     fn non_default_group_key_by_id(&self, group_id: GroupId) -> Option<GroupKey> {
-        let group = self.session.find_group_by_id(self.compartment, group_id)?;
+        let group = self.unit.find_group_by_id(self.compartment, group_id)?;
         Some(group.borrow().key().clone())
     }
 
     fn mapping_key_by_id(&self, mapping_id: MappingId) -> Option<MappingKey> {
-        let mapping = self
-            .session
-            .find_mapping_by_id(self.compartment, mapping_id)?;
+        let mapping = self.unit.find_mapping_by_id(self.compartment, mapping_id)?;
         Some(mapping.borrow().key().clone())
     }
 }
 
-impl DataToModelConversionContext for CompartmentInSession<'_> {
+impl DataToModelConversionContext for CompartmentInUnit<'_> {
     fn non_default_group_id_by_key(&self, key: &GroupKey) -> Option<GroupId> {
-        let group = self.session.find_group_by_key(self.compartment, key)?;
+        let group = self.unit.find_group_by_key(self.compartment, key)?;
         Some(group.borrow().id())
     }
 
     fn mapping_id_by_key(&self, key: &MappingKey) -> Option<MappingId> {
-        self.session.find_mapping_id_by_key(self.compartment, key)
+        self.unit.find_mapping_id_by_key(self.compartment, key)
     }
 }
 
-impl ApiToDataConversionContext for CompartmentInSession<'_> {
+impl ApiToDataConversionContext for CompartmentInUnit<'_> {
     fn compartment(&self) -> CompartmentKind {
         self.compartment
     }
 
     fn param_index_by_key(&self, key: &str) -> Option<CompartmentParamIndex> {
         let (i, _) = self
-            .session
+            .unit
             .params()
             .compartment_params(self.compartment)
             .find_setting_by_key(key)?;
@@ -1053,7 +1044,7 @@ impl SimpleDataToModelConversionContext {
     pub fn from_session_or_random(
         groups: &[GroupModelData],
         mappings: &[MappingModelData],
-        compartment_in_session: Option<CompartmentInSession>,
+        compartment_in_session: Option<CompartmentInUnit>,
     ) -> Self {
         Self {
             group_id_by_key: groups
@@ -1094,7 +1085,7 @@ fn convert_mapping_snapshots_to_api(
     instance_state: &Unit,
     compartment: CompartmentKind,
 ) -> Vec<MappingSnapshot> {
-    let compartment_in_session = CompartmentInSession::new(session, compartment);
+    let compartment_in_session = CompartmentInUnit::new(session, compartment);
     convert_mapping_snapshots_to_api_internal(
         instance_state.mapping_snapshot_container(compartment),
         &compartment_in_session,

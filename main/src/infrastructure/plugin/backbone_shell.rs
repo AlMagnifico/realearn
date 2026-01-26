@@ -1,6 +1,6 @@
 use crate::application::{
-    RealearnControlSurfaceMainTaskSender, SessionCommand, SharedMapping, SharedUnitModel,
-    UnitModel, WeakUnitModel,
+    RealearnControlSurfaceMainTaskSender, SharedMapping, SharedUnitModel, UnitCommand, UnitModel,
+    WeakUnitModel,
 };
 use crate::base::notification;
 use crate::domain::{
@@ -2812,7 +2812,7 @@ impl UnitContainer for BackboneShell {
             &args.common,
             |session, weak_session| {
                 session.change_with_notification(
-                    SessionCommand::SetInstanceFx(fx_descriptor.clone()),
+                    UnitCommand::SetInstanceFx(fx_descriptor.clone()),
                     None,
                     weak_session,
                 );
@@ -2836,7 +2836,7 @@ impl UnitContainer for BackboneShell {
             &args.common,
             |session, weak_session| {
                 session.change_with_notification(
-                    SessionCommand::SetInstanceTrack(track_descriptor.clone()),
+                    UnitCommand::SetInstanceTrack(track_descriptor.clone()),
                     None,
                     weak_session,
                 );

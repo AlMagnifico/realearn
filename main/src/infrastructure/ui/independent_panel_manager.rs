@@ -2,7 +2,7 @@ use crate::infrastructure::ui::{MappingPanel, SessionMessagePanel, UnitPanel};
 use std::cell::OnceCell;
 use tracing::debug;
 
-use crate::application::{Affected, SessionProp, SharedMapping, UnitModel, WeakUnitModel};
+use crate::application::{Affected, SharedMapping, UnitModel, UnitProp, WeakUnitModel};
 use crate::domain::{
     CompartmentKind, MappingId, MappingMatchedEvent, SourceFeedbackEvent, TargetControlEvent,
     TargetValueChangedEvent,
@@ -59,7 +59,7 @@ impl IndependentPanelManager {
         });
     }
 
-    pub fn handle_affected(&self, affected: &Affected<SessionProp>, initiator: Option<u32>) {
+    pub fn handle_affected(&self, affected: &Affected<UnitProp>, initiator: Option<u32>) {
         for p in self.mapping_panels.iter().filter(|p| p.is_open()) {
             p.handle_affected(affected, initiator);
         }

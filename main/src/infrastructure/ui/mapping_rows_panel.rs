@@ -15,7 +15,7 @@ use std::cmp;
 use tracing::debug;
 
 use crate::application::{
-    Affected, SessionProp, SharedMapping, SharedUnitModel, UnitModel, WeakUnitModel,
+    Affected, SharedMapping, SharedUnitModel, UnitModel, UnitProp, WeakUnitModel,
 };
 use crate::domain::{CompartmentKind, MappingId, MappingMatchedEvent, QualifiedMappingId};
 use crate::infrastructure::data::MappingModelData;
@@ -82,7 +82,7 @@ impl MappingRowsPanel {
         }
     }
 
-    pub fn handle_affected(&self, affected: &Affected<SessionProp>, initiator: Option<u32>) {
+    pub fn handle_affected(&self, affected: &Affected<UnitProp>, initiator: Option<u32>) {
         if !self.is_open() {
             return;
         }
