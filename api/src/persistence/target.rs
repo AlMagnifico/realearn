@@ -1046,6 +1046,9 @@ pub struct SendOscTarget {
 pub struct EnableInstancesTarget {
     #[serde(flatten)]
     pub commons: TargetCommons,
+    /// For backwards compatibility, this defaults to [InstanceTagKind::UnitTags].
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tag_kind: Option<InstanceTagKind>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tags: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1140,6 +1143,35 @@ impl Default for BackwardCompatibleMappingSnapshotDescForTake {
 pub enum MappingSnapshotDescForLoad {
     Initial,
     ById { id: String },
+}
+
+/// The kind of tag to use to address Helgobox instances.
+///
+/// Of course, normally we should use instance tags. The only reason that we allow instances to be addressed by unit
+/// tags is that there was no other possibility in the past, and we need to maintain backward compatibility.
+#[derive(
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Debug,
+    Default,
+    Serialize,
+    Deserialize,
+    derive_more::Display,
+    strum::EnumIter,
+    num_enum::TryFromPrimitive,
+    num_enum::IntoPrimitive,
+)]
+#[repr(usize)]
+pub enum InstanceTagKind {
+    /// This is usually the correct way to address instances.
+    #[default]
+    #[display(fmt = "Instance tags")]
+    InstanceTags,
+    /// This is the legacy way to address instances.
+    #[display(fmt = "Unit tags")]
+    UnitTags,
 }
 
 impl MappingSnapshotDescForLoad {

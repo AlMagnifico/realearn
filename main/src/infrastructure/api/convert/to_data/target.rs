@@ -873,6 +873,7 @@ pub fn convert_target(t: Target) -> ConversionResult<TargetModelData> {
         Target::EnableInstances(d) => TargetModelData {
             category: TargetCategory::Reaper,
             r#type: ReaperTargetType::EnableInstances,
+            instance_tag_kind: d.tag_kind,
             tags: convert_tags(d.tags.unwrap_or_default())?,
             exclusivity: {
                 use Exclusivity as T;

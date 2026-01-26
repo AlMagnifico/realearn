@@ -3,13 +3,11 @@ use anyhow::Context;
 use reaper_medium::Hbrush;
 use std::cell::{Cell, OnceCell, RefCell};
 use std::fmt::Debug;
-use std::rc::{Rc, Weak};
+use std::rc::Weak;
 use std::sync;
 use std::sync::Arc;
 
-use crate::application::{
-    Affected, InstanceModel, InstanceProp, InstanceUi, SharedInstanceModel, UnitProp, UnitUi,
-};
+use crate::application::{Affected, InstanceProp, InstanceUi, SharedInstanceModel};
 use crate::domain::{InstanceId, UnitId};
 use crate::infrastructure::plugin::{
     reaper_main_window, BackboneShell, InstanceShell, SharedInstanceShell,

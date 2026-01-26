@@ -35,7 +35,7 @@ use helgoboss_learn::{
     AbsoluteValue, ControlType, ControlValue, NumericValue, PropValue, RawMidiEvent, RgbColor,
     TransformationInputProvider, UnitValue,
 };
-use helgobox_api::persistence::{LearnableTargetKind, TrackScope};
+use helgobox_api::persistence::{InstanceTagKind, LearnableTargetKind, TrackScope};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use reaper_high::{ChangeEvent, Fx, Guid, Project, Reaper, Track, TrackRoute};
 use reaper_medium::CommandId;
@@ -387,6 +387,7 @@ pub trait UnitContainer: Debug {
 }
 
 pub struct EnableInstancesArgs<'a> {
+    pub tag_kind: InstanceTagKind,
     pub common: InstanceContainerCommonArgs<'a>,
     pub is_enable: bool,
     pub exclusivity: Exclusivity,

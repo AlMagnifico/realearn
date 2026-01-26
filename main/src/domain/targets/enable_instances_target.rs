@@ -5,11 +5,13 @@ use crate::domain::{
     TargetTypeDef, UnitEvent, UnresolvedReaperTargetDef, DEFAULT_TARGET,
 };
 use helgoboss_learn::{AbsoluteValue, ControlType, ControlValue, Target, UnitValue};
+use helgobox_api::persistence::InstanceTagKind;
 use std::borrow::Cow;
 
 #[derive(Debug)]
 pub struct UnresolvedEnableInstancesTarget {
     pub scope: TagScope,
+    pub tag_kind: InstanceTagKind,
     pub exclusivity: Exclusivity,
 }
 
@@ -21,6 +23,7 @@ impl UnresolvedReaperTargetDef for UnresolvedEnableInstancesTarget {
     ) -> Result<Vec<ReaperTarget>, &'static str> {
         Ok(vec![ReaperTarget::EnableInstances(EnableInstancesTarget {
             scope: self.scope.clone(),
+            tag_kind: self.tag_kind,
             exclusivity: self.exclusivity,
         })])
     }
@@ -29,6 +32,7 @@ impl UnresolvedReaperTargetDef for UnresolvedEnableInstancesTarget {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EnableInstancesTarget {
     pub scope: TagScope,
+    pub tag_kind: InstanceTagKind,
     pub exclusivity: Exclusivity,
 }
 
@@ -48,6 +52,7 @@ impl RealearnTarget for EnableInstancesTarget {
         let value = value.to_unit_value()?;
         let is_enable = !value.is_zero();
         let args = EnableInstancesArgs {
+            tag_kind: self.tag_kind,
             common: context
                 .control_context
                 .instance_container_common_args(&self.scope),

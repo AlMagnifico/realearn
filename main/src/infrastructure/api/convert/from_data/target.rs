@@ -26,13 +26,13 @@ use helgobox_api::persistence::{
     CompartmentParameterDescriptor, CompartmentParameterValueTarget, DummyTarget,
     EnableInstancesTarget, EnableMappingsTarget, FxOnOffStateTarget, FxOnlineOfflineStateTarget,
     FxParameterAutomationTouchStateTarget, FxParameterValueTarget, FxToolTarget,
-    FxVisibilityTarget, GoToBookmarkTarget, InputDeviceMidiDestination, LastTouchedTarget,
-    LearnTargetMappingModification, LoadFxSnapshotTarget, LoadMappingSnapshotTarget,
-    LoadPotPresetTarget, MappingModification, ModifyMappingTarget, MouseTarget, PlayRateTarget,
-    PreviewPotPresetTarget, ReaperActionTarget, RouteAutomationModeTarget, RouteMonoStateTarget,
-    RouteMuteStateTarget, RoutePanTarget, RoutePhaseTarget, RouteTouchStateTarget,
-    RouteVolumeTarget, SeekTarget, SendMidiTarget, SendOscTarget,
-    SetTargetToLastTouchedMappingModification, StreamDeckBrightnessTarget,
+    FxVisibilityTarget, GoToBookmarkTarget, InputDeviceMidiDestination, InstanceTagKind,
+    LastTouchedTarget, LearnTargetMappingModification, LoadFxSnapshotTarget,
+    LoadMappingSnapshotTarget, LoadPotPresetTarget, MappingModification, ModifyMappingTarget,
+    MouseTarget, PlayRateTarget, PreviewPotPresetTarget, ReaperActionTarget,
+    RouteAutomationModeTarget, RouteMonoStateTarget, RouteMuteStateTarget, RoutePanTarget,
+    RoutePhaseTarget, RouteTouchStateTarget, RouteVolumeTarget, SeekTarget, SendMidiTarget,
+    SendOscTarget, SetTargetToLastTouchedMappingModification, StreamDeckBrightnessTarget,
     TakeMappingSnapshotTarget, TempoTarget, TrackArmStateTarget, TrackAutomationModeTarget,
     TrackAutomationTouchStateTarget, TrackMonitoringModeTarget, TrackMuteStateTarget,
     TrackPanTarget, TrackParentSendStateTarget, TrackPeakTarget, TrackPhaseTarget,
@@ -687,6 +687,7 @@ fn convert_real_target(
         }),
         EnableInstances => T::EnableInstances(EnableInstancesTarget {
             commons,
+            tag_kind: data.instance_tag_kind,
             tags: convert_tags(&data.tags, style),
             exclusivity: {
                 use persistence::InstanceExclusivity as T;

@@ -139,7 +139,6 @@ impl UnitPanel {
         let _ = self.do_with_session(|unit_model| {
             let state = self.state.borrow();
             let scroll_status = state.scroll_status.get_ref();
-            let unit_tags = unit_model.tags();
             let instance_model = unit_model.instance_model().borrow();
             let instance_tags = instance_model.tags();
             let instance_id = unit_model.instance_id();

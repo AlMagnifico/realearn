@@ -64,8 +64,8 @@ use base::metrics_util::MetricsHook;
 use camino::{Utf8Path, Utf8PathBuf};
 use helgobox_allocator::{start_async_deallocation_thread, AsyncDeallocatorCommandReceiver};
 use helgobox_api::persistence::{
-    Envelope, FxChainDescriptor, FxDescriptor, TargetTouchCause, TrackDescriptor, TrackFxChain,
-    VirtualControlElementCharacter,
+    Envelope, FxChainDescriptor, FxDescriptor, InstanceTagKind, TargetTouchCause, TrackDescriptor,
+    TrackFxChain, VirtualControlElementCharacter,
 };
 use itertools::Itertools;
 use once_cell::sync::Lazy;
@@ -2736,23 +2736,27 @@ impl UnitContainer for BackboneShell {
 
     fn enable_instances(&self, args: EnableInstancesArgs) -> Option<NonCryptoHashSet<Tag>> {
         let mut activated_inverse_tags = HashSet::default();
-        for session in self.unit_infos.borrow().iter() {
-            if let Some(session) = session.unit_model.upgrade() {
-                let session = session.borrow();
+        for unit_info in self.unit_infos.borrow().iter() {
+            if let Some(unit_model) = unit_info.unit_model.upgrade() {
+                let unit_model = unit_model.borrow();
                 // Don't touch ourselves.
-                if session.unit_id() == args.common.initiator_instance_id {
+                if unit_model.unit_id() == args.common.initiator_instance_id {
                     continue;
                 }
                 // Don't leave the context (project if in project, FX chain if monitoring FX).
-                let context = session.processor_context();
+                let context = unit_model.processor_context();
                 if context.project() != args.common.initiator_project {
                     continue;
                 }
                 // Determine how to change the instances.
-                let session_tags = session.tags();
+                let instance_model = unit_model.instance_model().borrow();
+                let relevant_tags = match args.tag_kind {
+                    InstanceTagKind::InstanceTags => instance_model.tags(),
+                    InstanceTagKind::UnitTags => unit_model.tags(),
+                };
                 let flag = match args.common.scope.determine_enable_disable_change(
                     args.exclusivity,
-                    session_tags,
+                    relevant_tags,
                     args.is_enable,
                 ) {
                     None => continue,
@@ -2761,7 +2765,7 @@ impl UnitContainer for BackboneShell {
                 if args.exclusivity == Exclusivity::Exclusive && !args.is_enable {
                     // Collect all *other* instance tags because they are going to be activated
                     // and we have to know about them!
-                    activated_inverse_tags.extend(session_tags.iter().cloned());
+                    activated_inverse_tags.extend(relevant_tags.iter().cloned());
                 }
                 let enable = if args.is_enable { flag } else { !flag };
                 let fx = context.containing_fx();

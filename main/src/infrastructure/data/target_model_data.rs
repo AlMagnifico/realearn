@@ -27,7 +27,7 @@ use base::default_util::{
 use base::hash_util::NonCryptoHashSet;
 use helgoboss_learn::{AbsoluteValue, Fraction, OscTypeTag, UnitValue};
 use helgobox_api::persistence::{
-    ActionScope, Axis, BrowseTracksMode, FxToolAction, LearnableTargetKind,
+    ActionScope, Axis, BrowseTracksMode, FxToolAction, InstanceTagKind, LearnableTargetKind,
     MappingSnapshotDescForLoad, MappingSnapshotDescForTake, MonitoringMode, MouseAction,
     PotFilterKind, SeekBehavior, TargetTouchCause, TargetValue, TrackScope, TrackToolAction,
     VirtualControlElementCharacter,
@@ -341,6 +341,14 @@ pub struct TargetModelData {
     pub retrigger: bool,
     #[serde(default, skip_serializing_if = "is_default")]
     pub real_time: bool,
+    /// Not set in presets < ReaLearn v2.18.3. In this, it must default to [InstanceTagKind::UnitTags]
+    /// to remain backward-compatible.
+    #[serde(
+        default,
+        deserialize_with = "deserialize_null_default",
+        skip_serializing_if = "is_default"
+    )]
+    pub instance_tag_kind: Option<InstanceTagKind>,
     #[serde(
         default,
         deserialize_with = "deserialize_null_default",
@@ -610,6 +618,7 @@ impl TargetModelData {
             poll_for_feedback: model.poll_for_feedback(),
             retrigger: model.retrigger(),
             real_time: model.real_time(),
+            instance_tag_kind: Some(model.instance_tag_kind()),
             tags: model.tags().to_vec(),
             mapping_snapshot: model.mapping_snapshot_desc_for_load(),
             take_mapping_snapshot: Some(model.mapping_snapshot_desc_for_take()),
@@ -861,6 +870,8 @@ impl TargetModelData {
         model.change(C::SetPollForFeedback(self.poll_for_feedback));
         model.change(C::SetRetrigger(self.retrigger));
         model.change(C::SetRealTime(self.real_time));
+        let instance_tag_kind = self.instance_tag_kind.unwrap_or(InstanceTagKind::UnitTags);
+        model.change(C::SetInstanceTagKind(instance_tag_kind));
         model.change(C::SetTags(self.tags.clone()));
         model.change(C::SetExclusivity(self.exclusivity));
         let group_id = conversion_context

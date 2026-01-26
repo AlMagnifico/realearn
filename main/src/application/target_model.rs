@@ -62,14 +62,14 @@ use crate::domain::ui_util::format_tags_as_csv;
 use base::hash_util::NonCryptoHashSet;
 use helgobox_api::persistence::{
     ActionScope, Axis, BrowseTracksMode, ClipColumnTrackContext, FxChainDescriptor,
-    FxDescriptorCommons, FxToolAction, InputDeviceMidiDestination, LearnTargetMappingModification,
-    LearnableTargetKind, MappingModification, MappingSnapshotDescForLoad,
-    MappingSnapshotDescForTake, MonitoringMode, MouseAction, MouseButton, PlaytimeColumnAction,
-    PlaytimeColumnDescriptor, PlaytimeMatrixAction, PlaytimeRowAction, PlaytimeRowDescriptor,
-    PlaytimeSlotDescriptor, PlaytimeSlotManagementAction, PlaytimeSlotTransportAction,
-    PotFilterKind, SeekBehavior, SendMidiDestination, SetTargetToLastTouchedMappingModification,
-    TargetTouchCause, TrackDescriptorCommons, TrackFxChain, TrackScope, TrackToolAction,
-    VirtualControlElementCharacter,
+    FxDescriptorCommons, FxToolAction, InputDeviceMidiDestination, InstanceTagKind,
+    LearnTargetMappingModification, LearnableTargetKind, MappingModification,
+    MappingSnapshotDescForLoad, MappingSnapshotDescForTake, MonitoringMode, MouseAction,
+    MouseButton, PlaytimeColumnAction, PlaytimeColumnDescriptor, PlaytimeMatrixAction,
+    PlaytimeRowAction, PlaytimeRowDescriptor, PlaytimeSlotDescriptor, PlaytimeSlotManagementAction,
+    PlaytimeSlotTransportAction, PotFilterKind, SeekBehavior, SendMidiDestination,
+    SetTargetToLastTouchedMappingModification, TargetTouchCause, TrackDescriptorCommons,
+    TrackFxChain, TrackScope, TrackToolAction, VirtualControlElementCharacter,
 };
 use playtime_api::persistence::ColumnAddress;
 use reaper_medium::{
@@ -165,6 +165,7 @@ pub enum TargetCommand {
     SetPlaytimeRowAction(PlaytimeRowAction),
     SetStopColumnIfSlotEmpty(bool),
     SetPollForFeedback(bool),
+    SetInstanceTagKind(InstanceTagKind),
     SetTags(Vec<Tag>),
     SetExclusivity(Exclusivity),
     SetGroupId(GroupId),
@@ -267,6 +268,7 @@ pub enum TargetProp {
     PlaytimeRowAction,
     StopColumnIfSlotEmpty,
     PollForFeedback,
+    InstanceTagKind,
     Tags,
     Exclusivity,
     GroupId,
@@ -586,6 +588,10 @@ impl Change<'_> for TargetModel {
                 self.poll_for_feedback = v;
                 One(P::PollForFeedback)
             }
+            C::SetInstanceTagKind(v) => {
+                self.instance_tag_kind = v;
+                One(P::InstanceTagKind)
+            }
             C::SetTags(v) => {
                 self.tags = v;
                 One(P::Tags)
@@ -797,8 +803,9 @@ pub struct TargetModel {
     playtime_column_action: PlaytimeColumnAction,
     playtime_row_action: PlaytimeRowAction,
     stop_column_if_slot_empty: bool,
-    // # For targets that might have to be polled in order to get automatic feedback in all cases.
+    // # For targets that might have to be polled to get automatic feedback in all cases.
     poll_for_feedback: bool,
+    instance_tag_kind: InstanceTagKind,
     tags: Vec<Tag>,
     mapping_snapshot_type_for_load: MappingSnapshotTypeForLoad,
     mapping_snapshot_type_for_take: MappingSnapshotTypeForTake,
@@ -936,6 +943,7 @@ impl Default for TargetModel {
             axis: Default::default(),
             mouse_button: Default::default(),
             poll_for_feedback: true,
+            instance_tag_kind: Default::default(),
             tags: Default::default(),
             mapping_snapshot_type_for_load: MappingSnapshotTypeForLoad::Initial,
             mapping_snapshot_type_for_take: MappingSnapshotTypeForTake::LastLoaded,
@@ -1282,6 +1290,10 @@ impl TargetModel {
 
     pub fn real_time(&self) -> bool {
         self.real_time
+    }
+
+    pub fn instance_tag_kind(&self) -> InstanceTagKind {
+        self.instance_tag_kind
     }
 
     pub fn tags(&self) -> &[Tag] {
@@ -2651,6 +2663,7 @@ impl TargetModel {
                     }
                     EnableInstances => {
                         UnresolvedReaperTarget::EnableInstances(UnresolvedEnableInstancesTarget {
+                            tag_kind: self.instance_tag_kind,
                             scope: TagScope {
                                 tags: self.tags.iter().cloned().collect(),
                             },

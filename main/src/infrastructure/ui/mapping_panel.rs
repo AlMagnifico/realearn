@@ -28,12 +28,12 @@ use helgoboss_learn::{
     ValueSequence, VirtualColor, DEFAULT_OSC_ARG_VALUE_RANGE,
 };
 use helgobox_api::persistence::{
-    ActionScope, Axis, BrowseTracksMode, FxDescriptor, FxToolAction, LearnableTargetKind,
-    MidiScriptKind, MonitoringMode, MouseButton, PlaytimeColumnAction, PlaytimeColumnDescriptor,
-    PlaytimeColumnDescriptorKind, PlaytimeMatrixAction, PlaytimeRowAction, PlaytimeRowDescriptor,
-    PlaytimeRowDescriptorKind, PlaytimeSlotDescriptor, PlaytimeSlotDescriptorKind,
-    PlaytimeSlotManagementAction, PlaytimeSlotTransportAction, PotFilterKind, SeekBehavior,
-    TrackToolAction, VirtualControlElementCharacter,
+    ActionScope, Axis, BrowseTracksMode, FxDescriptor, FxToolAction, InstanceTagKind,
+    LearnableTargetKind, MidiScriptKind, MonitoringMode, MouseButton, PlaytimeColumnAction,
+    PlaytimeColumnDescriptor, PlaytimeColumnDescriptorKind, PlaytimeMatrixAction,
+    PlaytimeRowAction, PlaytimeRowDescriptor, PlaytimeRowDescriptorKind, PlaytimeSlotDescriptor,
+    PlaytimeSlotDescriptorKind, PlaytimeSlotManagementAction, PlaytimeSlotTransportAction,
+    PotFilterKind, SeekBehavior, TrackToolAction, VirtualControlElementCharacter,
 };
 use swell_ui::{
     DeviceContext, DialogUnits, Point, SharedView, SwellStringArg, View, ViewContext, WeakView,
@@ -612,6 +612,9 @@ impl MappingPanel {
                                             }
                                             P::MidiInputDevice => {
                                                 view.invalidate_target_line_3(None);
+                                            }
+                                            P::InstanceTagKind => {
+                                                view.invalidate_target_line_3(initiator);
                                             }
                                             P::Tags => {
                                                 view.invalidate_target_line_4_edit_control(initiator);
@@ -3168,6 +3171,15 @@ impl<'a> MutableMappingPanel<'a> {
                         TargetCommand::SetActionScope(scope),
                     ));
                 }
+                ReaperTargetType::EnableInstances => {
+                    let tag_kind: InstanceTagKind = combo
+                        .selected_combo_box_item_index()
+                        .try_into()
+                        .unwrap_or_default();
+                    self.change_mapping(MappingCommand::ChangeTarget(
+                        TargetCommand::SetInstanceTagKind(tag_kind),
+                    ));
+                }
                 ReaperTargetType::PlaytimeColumnAction => {
                     let kind = combo
                         .selected_combo_box_item_index()
@@ -5613,6 +5625,7 @@ impl<'a> ImmutableMappingPanel<'a> {
                 ReaperTargetType::TrackMonitoringMode => Some("Mode"),
                 ReaperTargetType::LoadMappingSnapshot => Some("Default"),
                 ReaperTargetType::ModifyMapping => Some("Unit"),
+                ReaperTargetType::EnableInstances => Some("Tag kind"),
                 ReaperTargetType::SendMidi
                     if self.mapping.target_model.send_midi_destination_type()
                         == SendMidiDestinationType::InputDevice =>
@@ -5788,6 +5801,11 @@ impl<'a> ImmutableMappingPanel<'a> {
                     combo.show();
                     combo.fill_combo_box_indexed(ActionScope::iter());
                     combo.select_combo_box_item_by_index(self.target.action_scope().into());
+                }
+                ReaperTargetType::EnableInstances => {
+                    combo.show();
+                    combo.fill_combo_box_indexed(InstanceTagKind::iter());
+                    combo.select_combo_box_item_by_index(self.target.instance_tag_kind().into());
                 }
                 ReaperTargetType::PlaytimeColumnAction => {
                     combo.show();
