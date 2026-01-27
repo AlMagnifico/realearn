@@ -254,4 +254,5 @@ crate-type = ["cdylib"]
 
 
 [lints.clippy]
-enum_glob_use = "deny"
+# TODO-high-refactoring Activate at some point. For now it's just too much to handle.
+#enum_glob_use = "deny"

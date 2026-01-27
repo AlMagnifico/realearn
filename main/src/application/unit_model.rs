@@ -1327,7 +1327,10 @@ impl UnitModel {
                             model.sync_compartment_settings(*compartment);
                             model.mark_compartment_dirty(*compartment);
                         }
-                        A::One(UP::InCompartment(compartment, A::One(CP::InGroup(_, affected)))) => {
+                        A::One(UP::InCompartment(
+                            compartment,
+                            A::One(CP::InGroup(_, affected)),
+                        )) => {
                             // Sync all mappings to processor if necessary (change of a single
                             // group can affect many mappings)
                             if affected.processing_relevance().is_some() {
