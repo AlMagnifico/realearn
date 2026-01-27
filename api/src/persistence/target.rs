@@ -1335,15 +1335,21 @@ impl PotFilterKind {
     }
 
     pub fn allows_excludes(&self) -> bool {
-        use PotFilterKind::*;
-        matches!(self, Database | Bank | SubBank)
+        use PotFilterKind as K;
+        matches!(self, K::Database | K::Bank | K::SubBank)
     }
 
     pub fn wants_sorting(&self) -> bool {
-        use PotFilterKind::*;
+        use PotFilterKind as K;
         matches!(
             self,
-            Database | Project | Bank | SubBank | Category | SubCategory | Mode
+            K::Database
+                | K::Project
+                | K::Bank
+                | K::SubBank
+                | K::Category
+                | K::SubCategory
+                | K::Mode
         )
     }
 
@@ -1368,10 +1374,10 @@ impl PotFilterKind {
     ///
     /// The other ones are called "advanced" kinds.
     pub fn is_core_kind(&self) -> bool {
-        use PotFilterKind::*;
+        use PotFilterKind as K;
         matches!(
             self,
-            Database | IsAvailable | IsSupported | IsUser | ProductKind | IsFavorite | HasPreview
+            K::Database | K::IsAvailable | K::IsSupported | K::IsUser | K::ProductKind | K::IsFavorite | K::HasPreview
         )
     }
 
@@ -1382,16 +1388,16 @@ impl PotFilterKind {
     /// recalculated. E.g. when changing the category, it means the set of possible sub categories
     /// might be affected (higher position) but the set of possible banks not (lower position).
     pub fn dependency_position(&self) -> u32 {
-        use PotFilterKind::*;
+        use PotFilterKind as K;
         match self {
-            Database | IsAvailable | IsSupported | IsUser | ProductKind | IsFavorite => 0,
-            Project => 1,
-            Bank => 2,
-            SubBank => 3,
-            Category => 4,
-            SubCategory => 5,
-            Mode => 6,
-            HasPreview => 7,
+            K::Database | K::IsAvailable | K::IsSupported | K::IsUser | K::ProductKind | K::IsFavorite => 0,
+            K::Project => 1,
+            K::Bank => 2,
+            K::SubBank => 3,
+            K::Category => 4,
+            K::SubCategory => 5,
+            K::Mode => 6,
+            K::HasPreview => 7,
         }
     }
 }
@@ -2410,13 +2416,13 @@ impl Default for BrowseTracksMode {
 
 impl BrowseTracksMode {
     pub fn scope(&self) -> TrackScope {
-        use BrowseTracksMode::*;
+        use BrowseTracksMode as M;
         match self {
-            AllTracks => TrackScope::AllTracks,
-            TracksVisibleInTcp | TracksVisibleInTcpAllowTwoSelections => {
+            M::AllTracks => TrackScope::AllTracks,
+            M::TracksVisibleInTcp | M::TracksVisibleInTcpAllowTwoSelections => {
                 TrackScope::TracksVisibleInTcp
             }
-            TracksVisibleInMcp | TracksVisibleInMcpAllowTwoSelections => {
+            M::TracksVisibleInMcp | M::TracksVisibleInMcpAllowTwoSelections => {
                 TrackScope::TracksVisibleInMcp
             }
         }

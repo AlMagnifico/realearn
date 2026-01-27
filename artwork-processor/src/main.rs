@@ -38,8 +38,8 @@ fn generate_icons(name_with_dashes: &str, svg: &str, additional_root_classes: &s
 }
 
 fn generate_toolbar_icons(name: &str, svg: &str, additional_root_classes: &str) -> Result<()> {
-    use ToolbarIconStatus::*;
-    let toolbar_statuses = [Normal, Hovered, Selected];
+    use ToolbarIconStatus as S;
+    let toolbar_statuses = [S::Normal, S::Hovered, S::Selected];
     generate_icon(
         svg,
         format!("resources/artwork/toolbar_icons/toolbar_{name}.png"),
@@ -86,12 +86,12 @@ fn render_toolbar_icon(
 ) -> Result<Pixmap> {
     let sprite_count = statuses.len() as u32;
     let mut pixmap = Pixmap::new(width * sprite_count, height).unwrap();
-    use ToolbarIconStatus::*;
+    use ToolbarIconStatus as S;
     for (i, status) in statuses.iter().enumerate() {
         let fg_color = match status {
-            Normal => "#818989",
-            Hovered => "#939a9a",
-            Selected => "#1abc98",
+            S::Normal => "#818989",
+            S::Hovered => "#939a9a",
+            S::Selected => "#1abc98",
         };
         let interpolated_svg = svg
             .replace(
