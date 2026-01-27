@@ -6,16 +6,16 @@ use crate::base::notification;
 use crate::domain::{
     ActionInvokedEvent, AdditionalFeedbackEvent, Backbone, ChangeInstanceFxArgs,
     ChangeInstanceTrackArgs, CompartmentKind, ControlSurfaceEventHandler, DeviceDiff,
-    EnableInstancesArgs, Exclusivity, FeedbackAudioHookTask, GroupId, HelgoboxWindowSnitch,
-    InputDescriptor, InstanceContainerCommonArgs, InstanceFxChangeRequest, InstanceId,
+    EnableInstancesArgs, EnableUnitsArgs, Exclusivity, FeedbackAudioHookTask, GroupId,
+    HelgoboxWindowSnitch, InputDescriptor, InstanceFxChangeRequest, InstanceId,
     InstanceTrackChangeRequest, LastTouchedTargetFilter, MainProcessor, MessageCaptureEvent,
-    MessageCaptureResult, MidiScanResult, NormalAudioHookTask, OscDeviceId, OscFeedbackProcessor,
-    OscFeedbackTask, OscScanResult, ProcessorContext, QualifiedInstanceEvent, QualifiedMappingId,
-    RealearnAccelerator, RealearnAudioHook, RealearnControlSurfaceMainTask,
-    RealearnControlSurfaceMiddleware, RealearnTarget, RealearnTargetState, ReaperTarget,
-    ReaperTargetType, RequestMidiDeviceIdentityCommand, RequestMidiDeviceIdentityReply,
-    SharedInstance, SharedMainProcessors, SharedRealTimeProcessor, Tag, UnitContainer, UnitId,
-    UnitOrchestrationEvent, WeakInstance, WeakUnit, GLOBAL_AUDIO_STATE,
+    MessageCaptureResult, MidiScanResult, ModifyUnitContainerCommonArgs, NormalAudioHookTask,
+    OscDeviceId, OscFeedbackProcessor, OscFeedbackTask, OscScanResult, ProcessorContext,
+    QualifiedInstanceEvent, QualifiedMappingId, RealearnAccelerator, RealearnAudioHook,
+    RealearnControlSurfaceMainTask, RealearnControlSurfaceMiddleware, RealearnTarget,
+    RealearnTargetState, ReaperTarget, ReaperTargetType, RequestMidiDeviceIdentityCommand,
+    RequestMidiDeviceIdentityReply, SharedInstance, SharedMainProcessors, SharedRealTimeProcessor,
+    Tag, UnitContainer, UnitId, UnitOrchestrationEvent, WeakInstance, WeakUnit, GLOBAL_AUDIO_STATE,
 };
 use crate::infrastructure::data::{
     CommonCompartmentPresetManager, CompartmentPresetManagerEventHandler, ControllerManager,
@@ -2249,7 +2249,7 @@ impl BackboneShell {
 
     fn do_with_initiator_session_or_sessions_matching_tags(
         &self,
-        common_args: &InstanceContainerCommonArgs,
+        common_args: &ModifyUnitContainerCommonArgs,
         f: impl Fn(&mut UnitModel, WeakUnitModel),
     ) -> Result<(), &'static str> {
         if common_args.scope.has_tags() {
@@ -2273,9 +2273,7 @@ impl BackboneShell {
         } else {
             // Modify the initiator session only.
             let shared_session = self
-                .find_unit_model_by_unit_id_ignoring_borrowed_ones(
-                    common_args.initiator_instance_id,
-                )
+                .find_unit_model_by_unit_id_ignoring_borrowed_ones(common_args.initiator_unit_id)
                 .ok_or("initiator session not found")?;
             let mut session = shared_session.borrow_mut();
             f(&mut session, Rc::downgrade(&shared_session));
@@ -2737,44 +2735,92 @@ impl UnitContainer for BackboneShell {
     fn enable_instances(&self, args: EnableInstancesArgs) -> Option<NonCryptoHashSet<Tag>> {
         let mut activated_inverse_tags = HashSet::default();
         for unit_info in self.unit_infos.borrow().iter() {
-            if let Some(unit_model) = unit_info.unit_model.upgrade() {
-                let unit_model = unit_model.borrow();
-                // Don't touch ourselves.
-                if unit_model.unit_id() == args.common.initiator_instance_id {
-                    continue;
-                }
-                // Don't leave the context (project if in project, FX chain if monitoring FX).
-                let context = unit_model.processor_context();
-                if context.project() != args.common.initiator_project {
-                    continue;
-                }
-                // Determine how to change the instances.
-                let instance_model = unit_model.instance_model().borrow();
-                let relevant_tags = match args.tag_kind {
-                    InstanceTagKind::InstanceTags => instance_model.tags(),
-                    InstanceTagKind::UnitTags => unit_model.tags(),
-                };
-                let flag = match args.common.scope.determine_enable_disable_change(
-                    args.exclusivity,
-                    relevant_tags,
-                    args.is_enable,
-                ) {
-                    None => continue,
-                    Some(f) => f,
-                };
-                if args.exclusivity == Exclusivity::Exclusive && !args.is_enable {
-                    // Collect all *other* instance tags because they are going to be activated
-                    // and we have to know about them!
-                    activated_inverse_tags.extend(relevant_tags.iter().cloned());
-                }
-                let enable = if args.is_enable { flag } else { !flag };
-                let fx = context.containing_fx();
-                if enable {
-                    let _ = fx.enable();
-                } else {
-                    let _ = fx.disable();
-                }
+            // Don't touch ourselves.
+            // TODO-high CONTINUE When instance tags are used, this should check the instance ID, not the unit ID!
+            if unit_info.unit_id == args.common.initiator_unit_id {
+                continue;
             }
+            let Some(unit_model) = unit_info.unit_model.upgrade() else {
+                continue;
+            };
+            let unit_model = unit_model.borrow();
+            // Don't leave the context (project if in project, FX chain if monitoring FX).
+            let context = unit_model.processor_context();
+            if context.project() != args.common.initiator_project {
+                continue;
+            }
+            // Determine how to change the instances.
+            let instance_model = unit_model.instance_model().borrow();
+            let relevant_tags = match args.tag_kind {
+                InstanceTagKind::InstanceTags => instance_model.tags(),
+                InstanceTagKind::UnitTags => unit_model.tags(),
+            };
+            let flag = match args.common.scope.determine_enable_disable_change(
+                args.exclusivity,
+                relevant_tags,
+                args.is_enable,
+            ) {
+                None => continue,
+                Some(f) => f,
+            };
+            if args.exclusivity == Exclusivity::Exclusive && !args.is_enable {
+                // Collect all *other* instance tags because they are going to be activated
+                // and we have to know about them!
+                activated_inverse_tags.extend(relevant_tags.iter().cloned());
+            }
+            let enable = if args.is_enable { flag } else { !flag };
+            let fx = context.containing_fx();
+            if enable {
+                let _ = fx.enable();
+            } else {
+                let _ = fx.disable();
+            }
+        }
+        if args.exclusivity == Exclusivity::Exclusive && !args.is_enable {
+            Some(activated_inverse_tags)
+        } else {
+            None
+        }
+    }
+
+    fn enable_units(&self, args: EnableUnitsArgs) -> Option<NonCryptoHashSet<Tag>> {
+        let mut activated_inverse_tags = HashSet::default();
+        for unit_info in self.unit_infos.borrow().iter() {
+            // Don't leave the context (current instance)
+            if unit_info.instance_id == args.common.initiator_instance_id {
+                continue;
+            }
+            let Some(unit_model) = unit_info.unit_model.upgrade() else {
+                continue;
+            };
+            let unit_model = unit_model.borrow();
+            // Don't touch ourselves.
+            if unit_model.unit_id() == args.common.initiator_unit_id {
+                continue;
+            }
+            // Determine how to change the instances.
+            let relevant_tags = unit_model.tags();
+            let flag = match args.common.scope.determine_enable_disable_change(
+                args.exclusivity,
+                relevant_tags,
+                args.is_enable,
+            ) {
+                None => continue,
+                Some(f) => f,
+            };
+            if args.exclusivity == Exclusivity::Exclusive && !args.is_enable {
+                // Collect all *other* unit tags because they are going to be activated
+                // and we have to know about them!
+                activated_inverse_tags.extend(relevant_tags.iter().cloned());
+            }
+            let enable = if args.is_enable { flag } else { !flag };
+            // TODO-high CONTINUE Enable/disable units! This is where it gets interesting.
+            // let fx = context.containing_fx();
+            // if enable {
+            //     let _ = fx.enable();
+            // } else {
+            //     let _ = fx.disable();
+            // }
         }
         if args.exclusivity == Exclusivity::Exclusive && !args.is_enable {
             Some(activated_inverse_tags)
@@ -2807,7 +2853,7 @@ impl UnitContainer for BackboneShell {
                 }
             }
             InstanceFxChangeRequest::SetFromMapping(id) => {
-                let mapping = self.find_original_mapping(args.common.initiator_instance_id, id)?;
+                let mapping = self.find_original_mapping(args.common.initiator_unit_id, id)?;
                 let mapping = mapping.borrow();
                 mapping.target_model.api_fx_descriptor()
             }
@@ -2831,7 +2877,7 @@ impl UnitContainer for BackboneShell {
                 convert_optional_guid_to_api_track_descriptor(guid)
             }
             InstanceTrackChangeRequest::SetFromMapping(id) => {
-                let mapping = self.find_original_mapping(args.common.initiator_instance_id, id)?;
+                let mapping = self.find_original_mapping(args.common.initiator_unit_id, id)?;
                 let mapping = mapping.borrow();
                 mapping.target_model.api_track_descriptor()
             }

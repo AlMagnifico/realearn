@@ -145,7 +145,7 @@ impl RealearnTarget for FxToolTarget {
         let args = ChangeInstanceFxArgs {
             common: context
                 .control_context
-                .instance_container_common_args(&self.scope),
+                .create_modify_unit_container_common_args(&self.scope),
             request,
         };
         context

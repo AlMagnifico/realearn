@@ -3430,6 +3430,7 @@ impl<EH: DomainEventHandler> Basics<EH> {
             feedback_output: self.settings.feedback_output,
             stream_deck_dev_id: self.settings.streamdeck_device_id,
             unit_container: self.unit_container,
+            instance_id: self.instance_id,
             instance: &self.instance,
             unit: &self.unit,
             unit_id: self.unit_id,

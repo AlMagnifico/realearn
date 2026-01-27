@@ -169,6 +169,9 @@ pub use modify_mapping_target::*;
 mod enable_instances_target;
 pub use enable_instances_target::*;
 
+mod enable_units_target;
+pub use enable_units_target::*;
+
 mod browse_group_mappings_target;
 pub use browse_group_mappings_target::*;
 

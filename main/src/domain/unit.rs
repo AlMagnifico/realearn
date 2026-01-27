@@ -83,6 +83,12 @@ pub struct Unit {
     /// - Set by target "ReaLearn: Enable/disable instances".
     /// - Non-redundant state!
     active_instance_tags: NonCryptoHashSet<Tag>,
+    /// All unit tags whose instances have been switched on via tag.
+    ///
+    /// - Persistent
+    /// - Set by target "ReaLearn: Enable/disable units".
+    /// - Non-redundant state!
+    active_unit_tags: NonCryptoHashSet<Tag>,
     /// Instance track.
     ///
     /// The instance track is persistent but it's persisted from the session, not from here.
@@ -135,6 +141,7 @@ impl Unit {
             global_control_and_feedback_state: Default::default(),
             active_mapping_tags: Default::default(),
             active_instance_tags: Default::default(),
+            active_unit_tags: Default::default(),
             instance_track_descriptor: Default::default(),
             instance_fx_descriptor: Default::default(),
             mapping_snapshot_container: Default::default(),
@@ -491,6 +498,45 @@ impl Unit {
             .send_complaining(UnitEvent::ActiveInstanceTags);
     }
 
+    pub fn only_these_unit_tags_are_active(&self, tags: &NonCryptoHashSet<Tag>) -> bool {
+        tags == &self.active_unit_tags
+    }
+
+    pub fn at_least_those_unit_tags_are_active(&self, tags: &NonCryptoHashSet<Tag>) -> bool {
+        tags.is_subset(&self.active_unit_tags)
+    }
+
+    pub fn activate_or_deactivate_unit_tags(
+        &mut self,
+        tags: &NonCryptoHashSet<Tag>,
+        activate: bool,
+    ) {
+        if activate {
+            self.active_unit_tags.extend(tags.iter().cloned());
+        } else {
+            self.active_unit_tags.retain(|t| !tags.contains(t));
+        }
+        self.notify_active_unit_tags_changed();
+    }
+
+    pub fn active_unit_tags(&self) -> &NonCryptoHashSet<Tag> {
+        &self.active_unit_tags
+    }
+
+    pub fn set_active_unit_tags_without_notification(&mut self, tags: NonCryptoHashSet<Tag>) {
+        self.active_unit_tags = tags;
+    }
+
+    pub fn set_active_unit_tags(&mut self, tags: NonCryptoHashSet<Tag>) {
+        self.active_unit_tags = tags;
+        self.notify_active_unit_tags_changed();
+    }
+
+    fn notify_active_unit_tags_changed(&mut self) {
+        self.event_sender
+            .send_complaining(UnitEvent::ActiveUnitTags);
+    }
+
     pub fn mapping_is_on(&self, id: QualifiedMappingId) -> bool {
         self.on_mappings.get_ref().contains(&id)
     }
@@ -622,6 +668,8 @@ pub enum UnitEvent {
     },
     /// For the "ReaLearn: Enable/disable instances" target.
     ActiveInstanceTags,
+    /// For the "ReaLearn: Enable/disable units" target.
+    ActiveUnitTags,
     /// For the "ReaLearn: Load mapping snapshot" target.
     MappingSnapshotActivated {
         compartment: CompartmentKind,

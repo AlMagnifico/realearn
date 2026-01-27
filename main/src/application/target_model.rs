@@ -32,10 +32,10 @@ use crate::domain::{
     UnresolvedBrowsePotFilterItemsTarget, UnresolvedBrowsePotPresetsTarget,
     UnresolvedBrowseTracksTarget, UnresolvedCompartmentParameterValueTarget,
     UnresolvedCompoundMappingTarget, UnresolvedDummyTarget, UnresolvedEnableInstancesTarget,
-    UnresolvedEnableMappingsTarget, UnresolvedFxEnableTarget, UnresolvedFxOnlineTarget,
-    UnresolvedFxOpenTarget, UnresolvedFxParameterTarget, UnresolvedFxParameterTouchStateTarget,
-    UnresolvedFxPresetTarget, UnresolvedFxToolTarget, UnresolvedGoToBookmarkTarget,
-    UnresolvedLastTouchedTarget, UnresolvedLoadFxSnapshotTarget,
+    UnresolvedEnableMappingsTarget, UnresolvedEnableUnitsTarget, UnresolvedFxEnableTarget,
+    UnresolvedFxOnlineTarget, UnresolvedFxOpenTarget, UnresolvedFxParameterTarget,
+    UnresolvedFxParameterTouchStateTarget, UnresolvedFxPresetTarget, UnresolvedFxToolTarget,
+    UnresolvedGoToBookmarkTarget, UnresolvedLastTouchedTarget, UnresolvedLoadFxSnapshotTarget,
     UnresolvedLoadMappingSnapshotTarget, UnresolvedLoadPotPresetTarget, UnresolvedMidiSendTarget,
     UnresolvedModifyMappingTarget, UnresolvedMouseTarget, UnresolvedOscSendTarget,
     UnresolvedPlayrateTarget, UnresolvedPreviewPotPresetTarget, UnresolvedReaperTarget,
@@ -2670,6 +2670,14 @@ impl TargetModel {
                             exclusivity: self.exclusivity,
                         })
                     }
+                    EnableUnits => {
+                        UnresolvedReaperTarget::EnableUnits(UnresolvedEnableUnitsTarget {
+                            scope: TagScope {
+                                tags: self.tags.iter().cloned().collect(),
+                            },
+                            exclusivity: self.exclusivity,
+                        })
+                    }
                     BrowseGroup => {
                         UnresolvedReaperTarget::BrowseGroup(UnresolvedBrowseGroupTarget {
                             compartment,
@@ -3378,6 +3386,9 @@ impl Display for TargetModelFormatMultiLine<'_> {
                             self.target.instance_tag_kind(),
                             format_tags_as_csv(&self.target.tags),
                         )
+                    }
+                    EnableUnits => {
+                        write!(f, "{tt}\n{}", format_tags_as_csv(&self.target.tags),)
                     }
                     TrackAutomationMode => {
                         write!(

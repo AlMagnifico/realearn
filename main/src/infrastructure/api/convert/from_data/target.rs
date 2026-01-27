@@ -24,9 +24,9 @@ use helgobox_api::persistence::{
     BrowseFxChainTarget, BrowseFxPresetsTarget, BrowseGroupMappingsTarget,
     BrowsePotFilterItemsTarget, BrowsePotPresetsTarget, BrowseTracksTarget,
     CompartmentParameterDescriptor, CompartmentParameterValueTarget, DummyTarget,
-    EnableInstancesTarget, EnableMappingsTarget, FxOnOffStateTarget, FxOnlineOfflineStateTarget,
-    FxParameterAutomationTouchStateTarget, FxParameterValueTarget, FxToolTarget,
-    FxVisibilityTarget, GoToBookmarkTarget, InputDeviceMidiDestination, InstanceTagKind,
+    EnableInstancesTarget, EnableMappingsTarget, EnableUnitsTarget, FxOnOffStateTarget,
+    FxOnlineOfflineStateTarget, FxParameterAutomationTouchStateTarget, FxParameterValueTarget,
+    FxToolTarget, FxVisibilityTarget, GoToBookmarkTarget, InputDeviceMidiDestination,
     LastTouchedTarget, LearnTargetMappingModification, LoadFxSnapshotTarget,
     LoadMappingSnapshotTarget, LoadPotPresetTarget, MappingModification, ModifyMappingTarget,
     MouseTarget, PlayRateTarget, PreviewPotPresetTarget, ReaperActionTarget,
@@ -691,6 +691,19 @@ fn convert_real_target(
             tags: convert_tags(&data.tags, style),
             exclusivity: {
                 use persistence::InstanceExclusivity as T;
+                use Exclusivity::*;
+                match data.exclusivity {
+                    NonExclusive => None,
+                    Exclusive => Some(T::Exclusive),
+                    ExclusiveOnOnly => Some(T::ExclusiveOnOnly),
+                }
+            },
+        }),
+        EnableUnits => T::EnableUnits(EnableUnitsTarget {
+            commons,
+            tags: convert_tags(&data.tags, style),
+            exclusivity: {
+                use persistence::UnitExclusivity as T;
                 use Exclusivity::*;
                 match data.exclusivity {
                     NonExclusive => None,

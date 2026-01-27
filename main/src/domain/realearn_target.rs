@@ -6,7 +6,7 @@ use crate::domain::{
     format_as_pretty_hex, new_set_track_ui_functions_are_available, scoped_track_index,
     AdditionalFeedbackEvent, AdditionalTransformationInput, BasicSettings, CompartmentKind,
     DomainEventHandler, Exclusivity, ExtendedProcessorContext, FeedbackAudioHookTask,
-    FeedbackOutput, FeedbackRealTimeTask, GroupId, InstanceStateChanged, MainMapping,
+    FeedbackOutput, FeedbackRealTimeTask, GroupId, InstanceId, InstanceStateChanged, MainMapping,
     MappingControlResult, MappingId, OrderedMappingMap, OscFeedbackTask, PluginParamIndex,
     ProcessorContext, QualifiedMappingId, RealTimeReaperTarget, RealearnModeContext,
     RealearnSourceContext, ReaperTarget, SharedInstance, SharedUnit, StreamDeckDeviceId, Tag,
@@ -14,13 +14,13 @@ use crate::domain::{
     ACTION_TARGET, ALL_TRACK_FX_ENABLE_TARGET, ANY_ON_TARGET, AUTOMATION_MODE_OVERRIDE_TARGET,
     BROWSE_FXS_TARGET, BROWSE_GROUP_MAPPINGS_TARGET, BROWSE_POT_FILTER_ITEMS_TARGET,
     BROWSE_POT_PRESETS_TARGET, COMPARTMENT_PARAMETER_VALUE_TARGET, DUMMY_TARGET,
-    ENABLE_INSTANCES_TARGET, ENABLE_MAPPINGS_TARGET, FX_ENABLE_TARGET, FX_ONLINE_TARGET,
-    FX_OPEN_TARGET, FX_PARAMETER_TARGET, FX_PARAMETER_TOUCH_STATE_TARGET, FX_PRESET_TARGET,
-    FX_TOOL_TARGET, GO_TO_BOOKMARK_TARGET, LAST_TOUCHED_TARGET, LEARN_MAPPING_TARGET,
-    LOAD_FX_SNAPSHOT_TARGET, LOAD_MAPPING_SNAPSHOT_TARGET, LOAD_POT_PRESET_TARGET,
-    MIDI_SEND_TARGET, MOUSE_TARGET, OSC_SEND_TARGET, PLAYRATE_TARGET, PREVIEW_POT_PRESET_TARGET,
-    ROUTE_AUTOMATION_MODE_TARGET, ROUTE_MONO_TARGET, ROUTE_MUTE_TARGET, ROUTE_PAN_TARGET,
-    ROUTE_PHASE_TARGET, ROUTE_TOUCH_STATE_TARGET, ROUTE_VOLUME_TARGET,
+    ENABLE_INSTANCES_TARGET, ENABLE_MAPPINGS_TARGET, ENABLE_UNITS_TARGET, FX_ENABLE_TARGET,
+    FX_ONLINE_TARGET, FX_OPEN_TARGET, FX_PARAMETER_TARGET, FX_PARAMETER_TOUCH_STATE_TARGET,
+    FX_PRESET_TARGET, FX_TOOL_TARGET, GO_TO_BOOKMARK_TARGET, LAST_TOUCHED_TARGET,
+    LEARN_MAPPING_TARGET, LOAD_FX_SNAPSHOT_TARGET, LOAD_MAPPING_SNAPSHOT_TARGET,
+    LOAD_POT_PRESET_TARGET, MIDI_SEND_TARGET, MOUSE_TARGET, OSC_SEND_TARGET, PLAYRATE_TARGET,
+    PREVIEW_POT_PRESET_TARGET, ROUTE_AUTOMATION_MODE_TARGET, ROUTE_MONO_TARGET, ROUTE_MUTE_TARGET,
+    ROUTE_PAN_TARGET, ROUTE_PHASE_TARGET, ROUTE_TOUCH_STATE_TARGET, ROUTE_VOLUME_TARGET,
     SAVE_MAPPING_SNAPSHOT_TARGET, SEEK_TARGET, SELECTED_TRACK_TARGET,
     STREAM_DECK_BRIGHTNESS_TARGET, TEMPO_TARGET, TRACK_ARM_TARGET, TRACK_AUTOMATION_MODE_TARGET,
     TRACK_MONITORING_MODE_TARGET, TRACK_MUTE_TARGET, TRACK_PAN_TARGET, TRACK_PARENT_SEND_TARGET,
@@ -379,27 +379,46 @@ pub fn convert_reaper_color_to_helgoboss_learn(color: reaper_medium::RgbColor) -
 
 pub trait UnitContainer: Debug {
     fn find_session_by_id(&self, session_id: &str) -> Option<SharedUnitModel>;
+
     fn find_session_by_instance_id(&self, instance_id: UnitId) -> Option<SharedUnitModel>;
+
     /// Returns activated tags if they don't correspond to the tags in the args.
+    ///
+    /// This is the case when disabling instances and using the "exclusive" option (causing **other** instances
+    /// to become enabled).
     fn enable_instances(&self, args: EnableInstancesArgs) -> Option<NonCryptoHashSet<Tag>>;
+
+    /// Returns activated tags if they don't correspond to the tags in the args.
+    ///
+    /// This is the case when disabling units and using the "exclusive" option (causing **other** units
+    /// to become enabled).
+    fn enable_units(&self, args: EnableUnitsArgs) -> Option<NonCryptoHashSet<Tag>>;
+
     fn change_instance_fx(&self, args: ChangeInstanceFxArgs) -> Result<(), &'static str>;
+
     fn change_instance_track(&self, args: ChangeInstanceTrackArgs) -> Result<(), &'static str>;
 }
 
 pub struct EnableInstancesArgs<'a> {
     pub tag_kind: InstanceTagKind,
-    pub common: InstanceContainerCommonArgs<'a>,
+    pub common: ModifyUnitContainerCommonArgs<'a>,
+    pub is_enable: bool,
+    pub exclusivity: Exclusivity,
+}
+
+pub struct EnableUnitsArgs<'a> {
+    pub common: ModifyUnitContainerCommonArgs<'a>,
     pub is_enable: bool,
     pub exclusivity: Exclusivity,
 }
 
 pub struct ChangeInstanceFxArgs<'a> {
-    pub common: InstanceContainerCommonArgs<'a>,
+    pub common: ModifyUnitContainerCommonArgs<'a>,
     pub request: InstanceFxChangeRequest,
 }
 
 pub struct ChangeInstanceTrackArgs<'a> {
-    pub common: InstanceContainerCommonArgs<'a>,
+    pub common: ModifyUnitContainerCommonArgs<'a>,
     pub request: InstanceTrackChangeRequest,
 }
 
@@ -421,8 +440,9 @@ pub enum InstanceTrackChangeRequest {
     SetFromMapping(QualifiedMappingId),
 }
 
-pub struct InstanceContainerCommonArgs<'a> {
-    pub initiator_instance_id: UnitId,
+pub struct ModifyUnitContainerCommonArgs<'a> {
+    pub initiator_instance_id: InstanceId,
+    pub initiator_unit_id: UnitId,
     /// `None` if monitoring FX.
     pub initiator_project: Option<Project>,
     pub scope: &'a TagScope,
@@ -438,6 +458,7 @@ pub struct ControlContext<'a> {
     pub unit_container: &'a dyn UnitContainer,
     pub instance: &'a SharedInstance,
     pub unit: &'a SharedUnit,
+    pub instance_id: InstanceId,
     pub unit_id: UnitId,
     pub output_logging_enabled: bool,
     pub source_context: RealearnSourceContext<'a>,
@@ -487,12 +508,13 @@ impl ControlContext<'_> {
         }
     }
 
-    pub fn instance_container_common_args<'c>(
+    pub fn create_modify_unit_container_common_args<'c>(
         &self,
         scope: &'c TagScope,
-    ) -> InstanceContainerCommonArgs<'c> {
-        InstanceContainerCommonArgs {
-            initiator_instance_id: self.unit_id,
+    ) -> ModifyUnitContainerCommonArgs<'c> {
+        ModifyUnitContainerCommonArgs {
+            initiator_instance_id: self.instance_id,
+            initiator_unit_id: self.unit_id,
             initiator_project: self.processor_context.project(),
             scope,
         }
@@ -723,6 +745,7 @@ pub enum ReaperTargetType {
     // ReaLearn targets
     Dummy = 53,
     EnableInstances = 38,
+    EnableUnits = 67,
     EnableMappings = 36,
     ModifyMapping = 62,
     CompartmentParameterValue = 63,
@@ -850,6 +873,7 @@ impl ReaperTargetType {
             SendOsc => &OSC_SEND_TARGET,
             Dummy => &DUMMY_TARGET,
             EnableInstances => &ENABLE_INSTANCES_TARGET,
+            EnableUnits => &ENABLE_UNITS_TARGET,
             EnableMappings => &ENABLE_MAPPINGS_TARGET,
             ModifyMapping => &LEARN_MAPPING_TARGET,
             LoadMappingSnapshot => &LOAD_MAPPING_SNAPSHOT_TARGET,

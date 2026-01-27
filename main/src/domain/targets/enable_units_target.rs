@@ -1,42 +1,39 @@
 use crate::domain::{
-    format_value_as_on_off, CompartmentKind, CompoundChangeEvent, ControlContext,
-    EnableInstancesArgs, Exclusivity, ExtendedProcessorContext, HitResponse, MappingControlContext,
-    RealearnTarget, ReaperTarget, ReaperTargetType, TagScope, TargetCharacter, TargetSection,
-    TargetTypeDef, UnitEvent, UnresolvedReaperTargetDef, DEFAULT_TARGET,
+    format_value_as_on_off, CompartmentKind, CompoundChangeEvent, ControlContext, EnableUnitsArgs,
+    Exclusivity, ExtendedProcessorContext, HitResponse, MappingControlContext, RealearnTarget,
+    ReaperTarget, ReaperTargetType, TagScope, TargetCharacter, TargetSection, TargetTypeDef,
+    UnitEvent, UnresolvedReaperTargetDef, DEFAULT_TARGET,
 };
 use helgoboss_learn::{AbsoluteValue, ControlType, ControlValue, Target, UnitValue};
-use helgobox_api::persistence::InstanceTagKind;
 use std::borrow::Cow;
 
 #[derive(Debug)]
-pub struct UnresolvedEnableInstancesTarget {
+pub struct UnresolvedEnableUnitsTarget {
     pub scope: TagScope,
-    pub tag_kind: InstanceTagKind,
     pub exclusivity: Exclusivity,
 }
 
-impl UnresolvedReaperTargetDef for UnresolvedEnableInstancesTarget {
+impl UnresolvedReaperTargetDef for UnresolvedEnableUnitsTarget {
     fn resolve(
         &self,
         _: ExtendedProcessorContext,
         _: CompartmentKind,
     ) -> Result<Vec<ReaperTarget>, &'static str> {
-        Ok(vec![ReaperTarget::EnableInstances(EnableInstancesTarget {
+        let target = EnableUnitsTarget {
             scope: self.scope.clone(),
-            tag_kind: self.tag_kind,
             exclusivity: self.exclusivity,
-        })])
+        };
+        Ok(vec![ReaperTarget::EnableUnits(target)])
     }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct EnableInstancesTarget {
+pub struct EnableUnitsTarget {
     pub scope: TagScope,
-    pub tag_kind: InstanceTagKind,
     pub exclusivity: Exclusivity,
 }
 
-impl RealearnTarget for EnableInstancesTarget {
+impl RealearnTarget for EnableUnitsTarget {
     fn control_type_and_character(&self, _: ControlContext) -> (ControlType, TargetCharacter) {
         (
             ControlType::AbsoluteContinuousRetriggerable,
@@ -51,27 +48,24 @@ impl RealearnTarget for EnableInstancesTarget {
     ) -> Result<HitResponse, &'static str> {
         let value = value.to_unit_value()?;
         let is_enable = !value.is_zero();
-        let args = EnableInstancesArgs {
-            tag_kind: self.tag_kind,
+        let args = EnableUnitsArgs {
             common: context
                 .control_context
                 .create_modify_unit_container_common_args(&self.scope),
             is_enable,
             exclusivity: self.exclusivity,
         };
-        let tags = context
-            .control_context
-            .unit_container
-            .enable_instances(args);
-        let mut instance_state = context.control_context.unit.borrow_mut();
-        use Exclusivity::*;
-        if self.exclusivity == Exclusive || (self.exclusivity == ExclusiveOnOnly && is_enable) {
+        let tags = context.control_context.unit_container.enable_units(args);
+        let mut unit = context.control_context.unit.borrow_mut();
+        if self.exclusivity == Exclusivity::Exclusive
+            || (self.exclusivity == Exclusivity::ExclusiveOnOnly && is_enable)
+        {
             // Completely replace
             let new_active_tags = tags.unwrap_or_else(|| self.scope.tags.clone());
-            instance_state.set_active_instance_tags(new_active_tags);
+            unit.set_active_unit_tags(new_active_tags);
         } else {
             // Add or remove
-            instance_state.activate_or_deactivate_instance_tags(&self.scope.tags, is_enable);
+            unit.activate_or_deactivate_unit_tags(&self.scope.tags, is_enable);
         }
         Ok(HitResponse::processed_with_effect())
     }
@@ -86,7 +80,7 @@ impl RealearnTarget for EnableInstancesTarget {
         _: ControlContext,
     ) -> (bool, Option<AbsoluteValue>) {
         match evt {
-            CompoundChangeEvent::Unit(UnitEvent::ActiveInstanceTags) => (true, None),
+            CompoundChangeEvent::Unit(UnitEvent::ActiveUnitTags) => (true, None),
             _ => (false, None),
         }
     }
@@ -96,22 +90,20 @@ impl RealearnTarget for EnableInstancesTarget {
     }
 
     fn reaper_target_type(&self) -> Option<ReaperTargetType> {
-        Some(ReaperTargetType::EnableInstances)
+        Some(ReaperTargetType::EnableUnits)
     }
 }
 
-impl<'a> Target<'a> for EnableInstancesTarget {
+impl<'a> Target<'a> for EnableUnitsTarget {
     type Context = ControlContext<'a>;
 
     fn current_value(&self, context: Self::Context) -> Option<AbsoluteValue> {
-        let instance_state = context.unit.borrow();
+        let unit_state = context.unit.borrow();
         use Exclusivity::*;
         let active = match self.exclusivity {
-            NonExclusive => {
-                instance_state.at_least_those_instance_tags_are_active(&self.scope.tags)
-            }
+            NonExclusive => unit_state.at_least_those_unit_tags_are_active(&self.scope.tags),
             Exclusive | ExclusiveOnOnly => {
-                instance_state.only_these_instance_tags_are_active(&self.scope.tags)
+                unit_state.only_these_unit_tags_are_active(&self.scope.tags)
             }
         };
         let uv = if active {
@@ -127,10 +119,10 @@ impl<'a> Target<'a> for EnableInstancesTarget {
     }
 }
 
-pub const ENABLE_INSTANCES_TARGET: TargetTypeDef = TargetTypeDef {
+pub const ENABLE_UNITS_TARGET: TargetTypeDef = TargetTypeDef {
     section: TargetSection::ReaLearn,
-    name: "Enable/disable instances",
-    short_name: "Enable/disable instances",
+    name: "Enable/disable units",
+    short_name: "Enable/disable units",
     supports_tags: true,
     supports_exclusivity: true,
     ..DEFAULT_TARGET

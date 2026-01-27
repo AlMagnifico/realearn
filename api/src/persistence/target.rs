@@ -158,6 +158,7 @@ pub enum Target {
     SendOsc(SendOscTarget),
     Dummy(DummyTarget),
     EnableInstances(EnableInstancesTarget),
+    EnableUnits(EnableUnitsTarget),
     EnableMappings(EnableMappingsTarget),
     ModifyMapping(ModifyMappingTarget),
     CompartmentParameterValue(CompartmentParameterValueTarget),
@@ -1056,6 +1057,16 @@ pub struct EnableInstancesTarget {
 }
 
 #[derive(Eq, PartialEq, Default, Serialize, Deserialize)]
+pub struct EnableUnitsTarget {
+    #[serde(flatten)]
+    pub commons: TargetCommons,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tags: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exclusivity: Option<UnitExclusivity>,
+}
+
+#[derive(Eq, PartialEq, Default, Serialize, Deserialize)]
 pub struct EnableMappingsTarget {
     #[serde(flatten)]
     pub commons: TargetCommons,
@@ -1794,6 +1805,12 @@ pub enum TrackExclusivity {
 
 #[derive(Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum InstanceExclusivity {
+    Exclusive,
+    ExclusiveOnOnly,
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub enum UnitExclusivity {
     Exclusive,
     ExclusiveOnOnly,
 }

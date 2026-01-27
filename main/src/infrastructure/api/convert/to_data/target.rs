@@ -886,6 +886,21 @@ pub fn convert_target(t: Target) -> ConversionResult<TargetModelData> {
             },
             ..init(d.commons)
         },
+        Target::EnableUnits(d) => TargetModelData {
+            category: TargetCategory::Reaper,
+            r#type: ReaperTargetType::EnableUnits,
+            tags: convert_tags(d.tags.unwrap_or_default())?,
+            exclusivity: {
+                use Exclusivity as T;
+                use UnitExclusivity::*;
+                match d.exclusivity {
+                    None => T::NonExclusive,
+                    Some(Exclusive) => T::Exclusive,
+                    Some(ExclusiveOnOnly) => T::ExclusiveOnOnly,
+                }
+            },
+            ..init(d.commons)
+        },
         Target::EnableMappings(d) => TargetModelData {
             category: TargetCategory::Reaper,
             r#type: ReaperTargetType::EnableMappings,
