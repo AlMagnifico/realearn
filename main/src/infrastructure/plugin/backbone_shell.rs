@@ -2736,8 +2736,18 @@ impl UnitContainer for BackboneShell {
         let mut activated_inverse_tags = HashSet::default();
         for unit_info in self.unit_infos.borrow().iter() {
             // Don't touch ourselves.
-            // TODO-high CONTINUE When instance tags are used, this should check the instance ID, not the unit ID!
-            if unit_info.unit_id == args.common.initiator_unit_id {
+            let this_is_our_unit = match args.tag_kind {
+                InstanceTagKind::InstanceTags => {
+                    unit_info.instance_id == args.common.initiator_instance_id
+                }
+                // When addressing instances via unit tags, we consider only the initiator unit as "self", not the
+                // surrounding instance. This is quite counter-intuitive because it means this change
+                // might actually affect the current instance (if it contains other units). But we need to
+                // keep that behavior to remain backward-compatible. Addressing instances via unit tags is legacy
+                // anyway.
+                InstanceTagKind::UnitTags => unit_info.unit_id == args.common.initiator_unit_id,
+            };
+            if this_is_our_unit {
                 continue;
             }
             let Some(unit_model) = unit_info.unit_model.upgrade() else {
