@@ -493,7 +493,6 @@ impl UnitModel {
         compartment: CompartmentKind,
         source_value: IncomingCompoundSourceValue,
     ) -> Option<FindMappingOutcome> {
-        use CompoundMappingSource::*;
         let virtualization = self.virtualize_source_value(source_value);
         let instance_state = self.unit.borrow();
         let mapping = self.mappings(compartment).find(|m| {
@@ -502,7 +501,9 @@ impl UnitModel {
                 return false;
             }
             let mapping_source = m.source_model.create_source();
-            if let (Virtual(virtual_source), Some(v)) = (&mapping_source, &virtualization) {
+            if let (CompoundMappingSource::Virtual(virtual_source), Some(v)) =
+                (&mapping_source, &virtualization)
+            {
                 virtual_source.control(&v.virtual_source_value).is_some()
             } else {
                 mapping_source
@@ -1056,10 +1057,10 @@ impl UnitModel {
         weak_unit: WeakUnitModel,
     ) {
         if let Some(affected) = mapping.change(cmd) {
-            use Affected::*;
-            let affected = One(UnitProp::InCompartment(
+            use Affected as A;
+            let affected = A::One(UnitProp::InCompartment(
                 mapping.compartment(),
-                One(CompartmentProp::InMapping(mapping.id(), affected)),
+                A::One(CompartmentProp::InMapping(mapping.id(), affected)),
             ));
             self.handle_affected(affected, initiator, weak_unit);
         }
@@ -1084,10 +1085,9 @@ impl UnitModel {
         weak_unit: WeakUnitModel,
     ) {
         if let Some(affected) = group.change(cmd) {
-            use Affected::*;
-            let affected = One(UnitProp::InCompartment(
+            let affected = Affected::One(UnitProp::InCompartment(
                 group.compartment(),
-                One(CompartmentProp::InGroup(group.id(), affected)),
+                Affected::One(CompartmentProp::InGroup(group.id(), affected)),
             ));
             self.handle_affected(affected, initiator, weak_unit);
         }
@@ -1132,29 +1132,29 @@ impl UnitModel {
 
     /// Changes unit properties without notifying listeners.
     pub fn change(&mut self, cmd: UnitCommand) -> ChangeResult<UnitProp> {
-        use Affected::*;
+        use Affected as A;
         use UnitCommand as C;
         use UnitProp as P;
         let affected = match cmd {
             C::ToggleEnabled => {
                 self.enabled = !self.enabled;
-                Some(One(UnitProp::Enabled))
+                Some(A::One(UnitProp::Enabled))
             }
             C::SetEnabled(enabled) => {
                 self.enabled = enabled;
-                Some(One(UnitProp::Enabled))
+                Some(A::One(UnitProp::Enabled))
             }
             C::SetUnitName(unit_name) => {
                 self.name = unit_name;
-                Some(One(UnitProp::UnitName))
+                Some(A::One(UnitProp::UnitName))
             }
             C::SetUnitKey(unit_key) => {
                 self.unit_key = unit_key;
-                Some(One(UnitProp::UnitKey))
+                Some(A::One(UnitProp::UnitKey))
             }
             C::SetUnitTags(tags) => {
                 self.tags = tags;
-                Some(One(UnitProp::UnitTags))
+                Some(A::One(UnitProp::UnitTags))
             }
             C::SetInstanceTrack(api_desc) => {
                 let virtual_track =
@@ -1169,7 +1169,7 @@ impl UnitModel {
                     .set_instance_track_descriptor(virtual_track);
                 self.normal_main_task_sender
                     .send_complaining(NormalMainTask::NotifyConditionsChanged);
-                Some(One(P::InstanceTrack))
+                Some(A::One(P::InstanceTrack))
             }
             C::SetInstanceFx(api_desc) => {
                 let virtual_fx =
@@ -1184,28 +1184,28 @@ impl UnitModel {
                     .set_instance_fx_descriptor(virtual_fx);
                 self.normal_main_task_sender
                     .send_complaining(NormalMainTask::NotifyConditionsChanged);
-                Some(One(P::InstanceFx))
+                Some(A::One(P::InstanceFx))
             }
             C::SetMatchEvenInactiveMappings(value) => {
                 self.match_even_inactive_mappings = value;
-                Some(One(P::MatchEvenInactiveMappings))
+                Some(A::One(P::MatchEvenInactiveMappings))
             }
             C::SetWantsKeyboardInput(value) => {
                 self.wants_keyboard_input = value;
-                Some(One(P::WantsKeyboardInput))
+                Some(A::One(P::WantsKeyboardInput))
             }
             C::SetStreamDeckDevice(value) => {
                 self.stream_deck_device_id = value;
-                Some(One(P::StreamDeckDeviceId))
+                Some(A::One(P::StreamDeckDeviceId))
             }
             C::ChangeCompartment(compartment, cmd) => self
                 .change_compartment_internal(compartment, cmd)?
-                .map(|affected| One(P::InCompartment(compartment, affected))),
+                .map(|affected| A::One(P::InCompartment(compartment, affected))),
             C::AdjustMappingModeIfNecessary(id) => self
                 .changing_mapping_by_id(id, |ctx| {
                     Ok(ctx.mapping.adjust_mode_if_necessary(ctx.extended_context))
                 })?
-                .map(|affected| One(P::InCompartment(id.compartment, affected))),
+                .map(|affected| A::One(P::InCompartment(id.compartment, affected))),
         };
         Ok(affected)
     }
@@ -1217,11 +1217,11 @@ impl UnitModel {
         weak_unit: WeakUnitModel,
         f: impl FnOnce(MappingChangeContext) -> ChangeResult<MappingProp>,
     ) -> Result<(), String> {
-        use Affected::*;
+        use Affected as A;
         use UnitProp as P;
         let affected = self
             .changing_mapping_by_id(id, f)?
-            .map(|affected| One(P::InCompartment(id.compartment, affected)));
+            .map(|affected| A::One(P::InCompartment(id.compartment, affected)));
         if let Some(affected) = affected {
             self.handle_affected(affected, initiator, weak_unit);
         }
@@ -1247,11 +1247,11 @@ impl UnitModel {
         weak_unit: WeakUnitModel,
         f: impl FnOnce(MappingChangeContext) -> ChangeResult<MappingProp>,
     ) -> Result<(), String> {
-        use Affected::*;
+        use Affected as A;
         use UnitProp as P;
         let affected = self
             .changing_mapping(mapping, f)?
-            .map(|affected| One(P::InCompartment(mapping.compartment(), affected)));
+            .map(|affected| A::One(P::InCompartment(mapping.compartment(), affected)));
         if let Some(affected) = affected {
             self.handle_affected(affected, initiator, weak_unit);
         }
@@ -1263,20 +1263,20 @@ impl UnitModel {
         compartment: CompartmentKind,
         weak_unit: WeakUnitModel,
     ) {
-        use Affected::*;
+        use Affected as A;
         self.handle_affected(
-            One(UnitProp::InCompartment(compartment, Multiple)),
+            A::One(UnitProp::InCompartment(compartment, A::Multiple)),
             None,
             weak_unit,
         );
     }
 
     pub fn notify_mapping_has_changed(&mut self, id: QualifiedMappingId, weak_unit: WeakUnitModel) {
-        use Affected::*;
+        use Affected as A;
         self.handle_affected(
-            One(UnitProp::InCompartment(
+            A::One(UnitProp::InCompartment(
                 id.compartment,
-                One(CompartmentProp::InMapping(id.id, Multiple)),
+                A::One(CompartmentProp::InMapping(id.id, A::Multiple)),
             )),
             None,
             weak_unit,
@@ -1307,27 +1307,27 @@ impl UnitModel {
                     return;
                 };
                 {
-                    use Affected::*;
-                    use CompartmentProp::*;
-                    use UnitProp::*;
+                    use Affected as A;
+                    use CompartmentProp as CP;
+                    use UnitProp as UP;
                     let mut model = model.borrow_mut();
                     match &affected {
-                        One(
-                            Enabled
-                            | WantsKeyboardInput
-                            | StreamDeckDeviceId
-                            | MatchEvenInactiveMappings,
+                        A::One(
+                            UP::Enabled
+                            | UP::WantsKeyboardInput
+                            | UP::StreamDeckDeviceId
+                            | UP::MatchEvenInactiveMappings,
                         ) => {
                             model.sync_settings();
                         }
-                        One(InCompartment(compartment, One(Notes))) => {
+                        A::One(UP::InCompartment(compartment, A::One(CP::Notes))) => {
                             model.mark_compartment_dirty(*compartment);
                         }
-                        One(InCompartment(compartment, One(CommonLua))) => {
+                        A::One(UP::InCompartment(compartment, A::One(CP::CommonLua))) => {
                             model.sync_compartment_settings(*compartment);
                             model.mark_compartment_dirty(*compartment);
                         }
-                        One(InCompartment(compartment, One(InGroup(_, affected)))) => {
+                        A::One(UP::InCompartment(compartment, A::One(CP::InGroup(_, affected)))) => {
                             // Sync all mappings to processor if necessary (change of a single
                             // group can affect many mappings)
                             if affected.processing_relevance().is_some() {
@@ -1336,22 +1336,25 @@ impl UnitModel {
                             // Mark dirty
                             model.mark_compartment_dirty(*compartment);
                         }
-                        One(InCompartment(compartment, One(InMapping(mapping_id, affected)))) => {
+                        A::One(UP::InCompartment(
+                            compartment,
+                            A::One(CP::InMapping(mapping_id, affected)),
+                        )) => {
                             // Sync mapping to processors if necessary.
                             if let Some(relevance) = affected.processing_relevance() {
                                 if let Some(mapping) =
                                     model.find_mapping_by_id(*compartment, *mapping_id)
                                 {
                                     let mapping = mapping.borrow();
-                                    use ProcessingRelevance::*;
+                                    use ProcessingRelevance as R;
                                     match relevance {
-                                        PersistentProcessingRelevant => {
+                                        R::PersistentProcessingRelevant => {
                                             // Keep syncing persistent mapping processing state only
                                             // (must be cheap because can be triggered by processing).
                                             model
                                                 .sync_persistent_mapping_processing_state(&mapping);
                                         }
-                                        ProcessingRelevant => {
+                                        R::ProcessingRelevant => {
                                             // Keep syncing complete mappings to processors.
                                             model.sync_single_mapping_to_processors(&mapping);
                                         }
@@ -1422,13 +1425,12 @@ impl UnitModel {
         mapping: &mut MappingModel,
         f: impl FnOnce(MappingChangeContext) -> ChangeResult<MappingProp>,
     ) -> ChangeResult<CompartmentProp> {
-        use Affected::*;
         let change_context = MappingChangeContext {
             mapping,
             extended_context: self.extended_context(),
         };
         Ok(f(change_context)?
-            .map(|affected| One(CompartmentProp::InMapping(mapping.id(), affected))))
+            .map(|affected| Affected::One(CompartmentProp::InMapping(mapping.id(), affected))))
     }
 
     pub fn compartment_in_unit(&self, compartment: CompartmentKind) -> CompartmentInUnit {
@@ -2827,83 +2829,83 @@ impl Display for UnitModel {
 impl DomainEventHandler for WeakUnitModel {
     fn handle_event(&self, event: DomainEvent) -> Result<(), Box<dyn Error>> {
         let unit = self.upgrade().ok_or("unit not existing anymore")?;
-        use DomainEvent::*;
+        use DomainEvent as E;
         match event {
-            Info(evt) => {
+            E::Info(evt) => {
                 let s = unit.try_borrow()?;
                 s.ui().handle_internal_info_event(evt);
             }
-            ConditionsChanged => {
+            E::ConditionsChanged => {
                 let s = unit.try_borrow()?;
                 s.ui().conditions_changed()
             }
-            TimeForCelebratingSuccess => {
+            E::TimeForCelebratingSuccess => {
                 let s = unit.try_borrow()?;
                 s.ui().celebrate_success()
             }
-            CapturedIncomingMessage(event) => {
+            E::CapturedIncomingMessage(event) => {
                 unit.try_borrow_mut()?.captured_incoming_message(event);
             }
-            UpdatedOnMappings(on_mappings) => {
+            E::UpdatedOnMappings(on_mappings) => {
                 unit.try_borrow()?
                     .unit
                     .try_borrow_mut()?
                     .set_on_mappings(on_mappings);
             }
-            GlobalControlAndFeedbackStateChanged(state) => {
+            E::GlobalControlAndFeedbackStateChanged(state) => {
                 let unit = unit.try_borrow()?;
                 unit.unit
                     .try_borrow_mut()?
                     .set_global_control_and_feedback_state(state);
                 unit.ui().handle_global_control_and_feedback_state_changed();
             }
-            UpdatedSingleMappingOnState(event) => {
+            E::UpdatedSingleMappingOnState(event) => {
                 unit.try_borrow()?
                     .unit
                     .try_borrow_mut()?
                     .set_mapping_on(event.id, event.is_on);
             }
-            TargetValueChanged(e) => {
+            E::TargetValueChanged(e) => {
                 // If the unit is borrowed already, just let it be. It happens only in a very
                 // particular case of reentrancy (because of a quirk in REAPER related to master
                 // tempo notification, https://github.com/helgoboss/helgobox/issues/199). If the
                 // target value slider is not updated then ... so what.
                 unit.try_borrow()?.ui().target_value_changed(e);
             }
-            UpdatedSingleParameterValue { index, value } => {
+            E::UpdatedSingleParameterValue { index, value } => {
                 let mut unit = unit.try_borrow_mut()?;
                 unit.params.at_mut(index).set_raw_value(value);
                 unit.ui().parameters_changed(&unit);
             }
-            UpdatedAllParameters(params) => {
+            E::UpdatedAllParameters(params) => {
                 let mut unit = unit.try_borrow_mut()?;
                 unit.params = params;
                 unit.ui().parameters_changed(&unit);
             }
-            FullResyncRequested => {
+            E::FullResyncRequested => {
                 debug!("FullResyncRequested received");
                 unit.try_borrow_mut()?.full_sync();
             }
-            MidiDevicesChanged => {
+            E::MidiDevicesChanged => {
                 unit.try_borrow()?.ui().midi_devices_changed();
             }
-            ProjectionFeedback(value) => {
+            E::ProjectionFeedback(value) => {
                 let s = unit.try_borrow()?;
                 s.ui().send_projection_feedback(&s, value);
             }
-            MappingMatched(event) => {
+            E::MappingMatched(event) => {
                 let s = unit.try_borrow()?;
                 s.ui().mapping_matched(event);
             }
-            HandleTargetControl(event) => {
+            E::HandleTargetControl(event) => {
                 let s = unit.try_borrow()?;
                 s.ui().handle_target_control(event);
             }
-            HandleSourceFeedback(event) => {
+            E::HandleSourceFeedback(event) => {
                 let s = unit.try_borrow()?;
                 s.ui().handle_source_feedback(event);
             }
-            MappingEnabledChangeRequested(event) => {
+            E::MappingEnabledChangeRequested(event) => {
                 let mut s = unit.try_borrow_mut()?;
                 let id = QualifiedMappingId::new(event.compartment, event.mapping_id);
                 s.change_mapping_from_unit(
@@ -2912,7 +2914,7 @@ impl DomainEventHandler for WeakUnitModel {
                     self.clone(),
                 );
             }
-            MappingModificationRequested(event) => {
+            E::MappingModificationRequested(event) => {
                 let mut s = unit.try_borrow_mut()?;
                 let id = QualifiedMappingId::new(event.compartment, event.mapping_id);
                 match event.modification {

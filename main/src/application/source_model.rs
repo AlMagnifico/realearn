@@ -120,141 +120,141 @@ impl Change<'_> for SourceModel {
     type Prop = SourceProp;
 
     fn change(&mut self, cmd: Self::Command) -> Option<Affected<SourceProp>> {
-        use Affected::*;
+        use Affected as A;
         use SourceCommand as C;
         use SourceProp as P;
         let affected = match cmd {
             C::SetCategory(v) => {
                 self.category = v;
-                One(P::Category)
+                A::One(P::Category)
             }
             C::SetMidiSourceType(v) => {
                 self.midi_source_type = v;
-                One(P::MidiSourceType)
+                A::One(P::MidiSourceType)
             }
             C::SetChannel(v) => {
                 self.channel = v;
-                One(P::Channel)
+                A::One(P::Channel)
             }
             C::SetMidiMessageNumber(v) => {
                 self.midi_message_number = v;
-                One(P::MidiMessageNumber)
+                A::One(P::MidiMessageNumber)
             }
             C::SetParameterNumberMessageNumber(v) => {
                 self.parameter_number_message_number = v;
-                One(P::ParameterNumberMessageNumber)
+                A::One(P::ParameterNumberMessageNumber)
             }
             C::SetCustomCharacter(v) => {
                 self.custom_character = v;
-                One(P::CustomCharacter)
+                A::One(P::CustomCharacter)
             }
             C::SetMidiClockTransportMessage(v) => {
                 self.midi_clock_transport_message = v;
-                One(P::MidiClockTransportMessage)
+                A::One(P::MidiClockTransportMessage)
             }
             C::SetIsRegistered(v) => {
                 self.is_registered = v;
-                One(P::IsRegistered)
+                A::One(P::IsRegistered)
             }
             C::SetIs14Bit(v) => {
                 self.is_14_bit = v;
-                One(P::Is14Bit)
+                A::One(P::Is14Bit)
             }
             C::SetRawMidiPattern(v) => {
                 self.raw_midi_pattern = v;
-                One(P::RawMidiPattern)
+                A::One(P::RawMidiPattern)
             }
             C::SetMidiScriptKind(v) => {
                 self.midi_script_kind = v;
-                One(P::MidiScriptKind)
+                A::One(P::MidiScriptKind)
             }
             C::SetMidiScript(v) => {
                 self.midi_script = v;
-                One(P::MidiScript)
+                A::One(P::MidiScript)
             }
             C::SetDisplayType(v) => {
                 self.display_type = v;
-                One(P::DisplayType)
+                A::One(P::DisplayType)
             }
             C::SetDisplayId(v) => {
                 self.display_id = v;
-                One(P::DisplayId)
+                A::One(P::DisplayId)
             }
             C::SetLine(v) => {
                 self.line = v;
-                One(P::Line)
+                A::One(P::Line)
             }
             C::SetOscAddressPattern(v) => {
                 self.osc_address_pattern = v;
-                One(P::OscAddressPattern)
+                A::One(P::OscAddressPattern)
             }
             C::SetOscArgIndex(v) => {
                 self.osc_arg_index = v;
-                One(P::OscArgIndex)
+                A::One(P::OscArgIndex)
             }
             C::SetOscArgTypeTag(v) => {
                 self.osc_arg_type_tag = v;
-                One(P::OscArgTypeTag)
+                A::One(P::OscArgTypeTag)
             }
             C::SetOscArgIsRelative(v) => {
                 self.osc_arg_is_relative = v;
-                One(P::OscArgIsRelative)
+                A::One(P::OscArgIsRelative)
             }
             C::SetOscArgValueRange(v) => {
                 self.osc_arg_value_range = v;
-                One(P::OscArgValueRange)
+                A::One(P::OscArgValueRange)
             }
             C::SetOscFeedbackArgs(v) => {
                 self.osc_feedback_args = v;
-                One(P::OscFeedbackArgs)
+                A::One(P::OscFeedbackArgs)
             }
             C::SetReaperSourceType(v) => {
                 self.reaper_source_type = v;
-                One(P::ReaperSourceType)
+                A::One(P::ReaperSourceType)
             }
             C::SetControlElementCharacter(v) => {
                 self.control_element_character = v;
-                One(P::ControlElementType)
+                A::One(P::ControlElementType)
             }
             C::SetControlElementId(v) => {
                 self.control_element_id = v;
-                One(P::ControlElementId)
+                A::One(P::ControlElementId)
             }
             C::SetTimerMillis(v) => {
                 self.timer_millis = v;
-                One(P::TimerMillis)
+                A::One(P::TimerMillis)
             }
             C::SetParameterIndex(v) => {
                 self.parameter_index = v;
-                One(P::ParameterIndex)
+                A::One(P::ParameterIndex)
             }
             C::SetKeystroke(v) => {
                 self.keystroke = v;
-                One(P::Keystroke)
+                A::One(P::Keystroke)
             }
             C::SetButtonIndex(v) => {
                 self.button_index = v;
-                One(P::ButtonIndex)
+                A::One(P::ButtonIndex)
             }
             C::SetButtonBackgroundType(v) => {
                 self.button_background_type = v;
-                One(P::ButtonBackgroundType)
+                A::One(P::ButtonBackgroundType)
             }
             C::SetButtonBackgroundImagePath(v) => {
                 self.button_background_image_path = relativize_against_resource_dir(v);
-                One(P::ButtonBackgroundImagePath)
+                A::One(P::ButtonBackgroundImagePath)
             }
             C::SetButtonForegroundType(v) => {
                 self.button_foreground_type = v;
-                One(P::ButtonForegroundType)
+                A::One(P::ButtonForegroundType)
             }
             C::SetButtonForegroundImagePath(v) => {
                 self.button_foreground_image_path = relativize_against_resource_dir(v);
-                One(P::ButtonForegroundImagePath)
+                A::One(P::ButtonForegroundImagePath)
             }
             C::SetButtonStaticText(v) => {
                 self.button_static_text = v;
-                One(P::ButtonStaticText)
+                A::One(P::ButtonStaticText)
             }
         };
         Some(affected)
@@ -483,25 +483,25 @@ impl SourceModel {
     }
 
     pub fn supports_control(&self) -> bool {
-        use SourceCategory::*;
+        use SourceCategory as C;
         match self.category {
-            Midi => self.midi_source_type.supports_control(),
-            Osc => self.osc_arg_type_tag.supports_control(),
-            Reaper => self.reaper_source_type.supports_control(),
-            Virtual | Keyboard | StreamDeck => true,
+            C::Midi => self.midi_source_type.supports_control(),
+            C::Osc => self.osc_arg_type_tag.supports_control(),
+            C::Reaper => self.reaper_source_type.supports_control(),
+            C::Virtual | C::Keyboard | C::StreamDeck => true,
             // Main use case: Group interaction (follow-only).
-            Never => true,
+            C::Never => true,
         }
     }
 
     pub fn supports_feedback(&self) -> bool {
-        use SourceCategory::*;
+        use SourceCategory as C;
         match self.category {
-            Midi => self.midi_source_type.supports_feedback(),
-            Osc => self.osc_arg_type_tag.supports_feedback(),
-            Reaper => self.reaper_source_type.supports_feedback(),
-            StreamDeck | Virtual => true,
-            Keyboard | Never => false,
+            C::Midi => self.midi_source_type.supports_feedback(),
+            C::Osc => self.osc_arg_type_tag.supports_feedback(),
+            C::Reaper => self.reaper_source_type.supports_feedback(),
+            C::StreamDeck | C::Virtual => true,
+            C::Keyboard | C::Never => false,
         }
     }
 
@@ -510,9 +510,9 @@ impl SourceModel {
         &mut self,
         source: &CompoundMappingSource,
     ) -> Option<Affected<MappingProp>> {
-        use CompoundMappingSource::*;
+        use CompoundMappingSource as S;
         match source {
-            Midi(s) => {
+            S::Midi(s) => {
                 self.category = SourceCategory::Midi;
                 self.midi_source_type = MidiSourceType::from_source(s);
                 self.channel = s.channel();
@@ -566,12 +566,12 @@ impl SourceModel {
                     _ => {}
                 }
             }
-            Virtual(s) => {
+            S::Virtual(s) => {
                 self.category = SourceCategory::Virtual;
                 self.control_element_character = s.control_element().character();
                 self.control_element_id = s.control_element().id();
             }
-            Osc(s) => {
+            S::Osc(s) => {
                 self.category = SourceCategory::Osc;
                 s.address_pattern()
                     .clone_into(&mut self.osc_address_pattern);
@@ -583,7 +583,7 @@ impl SourceModel {
                     .map(|d| d.is_relative())
                     .unwrap_or_default();
             }
-            Reaper(s) => {
+            S::Reaper(s) => {
                 self.category = SourceCategory::Reaper;
                 self.reaper_source_type = ReaperSourceType::from_source(s);
                 use ReaperSource::*;
@@ -598,14 +598,14 @@ impl SourceModel {
                     | Speech(_) => {}
                 }
             }
-            StreamDeck(s) => {
+            S::StreamDeck(s) => {
                 self.category = SourceCategory::StreamDeck;
                 self.button_index = s.button_index;
             }
-            Never => {
+            S::Never => {
                 self.category = SourceCategory::Never;
             }
-            Key(s) => {
+            S::Key(s) => {
                 self.category = SourceCategory::Keyboard;
                 self.keystroke = Some(s.stroke());
             }
