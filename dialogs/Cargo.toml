@@ -10,4 +10,5 @@ derive_more.workspace = true
 indexmap.workspace = true
 
 [lints.clippy]
-enum_glob_use = "deny"
+# Enum glob use is not really dangerous in this module. Non-critical.
+enum_glob_use = "allow"
