@@ -3137,10 +3137,10 @@ fn add_markdown(ui: &mut Ui, markdown: &str, max_height: f32) {
                                 open_link(&href);
                             }
                         } else {
-                            use HeadingLevel::*;
+                            use HeadingLevel as L;
                             let (size, always_strong) = match heading_level {
-                                Some(H1) => (20.0, true),
-                                Some(H2) => (16.0, true),
+                                Some(L::H1) => (20.0, true),
+                                Some(L::H2) => (16.0, true),
                                 _ => (14.0, false),
                             };
                             let mut span = RichText::new(text.as_ref()).size(size);

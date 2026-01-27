@@ -252,12 +252,12 @@ impl ProductKind {
         const EFFECT: u32 = 2;
         const ONE_SHOT: u32 = 4;
         const LOOP: u32 = 8;
-        use ProductKind::*;
+        use ProductKind as K;
         match self {
-            Effect => &EFFECT,
-            Instrument => &INSTRUMENT,
-            Loop => &LOOP,
-            OneShot => &ONE_SHOT,
+            K::Effect => &EFFECT,
+            K::Instrument => &INSTRUMENT,
+            K::Loop => &LOOP,
+            K::OneShot => &ONE_SHOT,
         }
     }
 }

@@ -56,8 +56,8 @@ impl Capability {
     }
 
     pub fn is_virtual_button(&self) -> bool {
-        use Capability::*;
-        matches!(self, Press { .. } | Toggle { .. } | Touch { .. })
+        use Capability as C;
+        matches!(self, C::Press { .. } | C::Toggle { .. } | C::Touch { .. })
     }
 }
 

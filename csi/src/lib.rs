@@ -109,9 +109,9 @@ impl<T> AnnotatedResult<T> {
 impl CsiObject {
     pub fn try_into_api_object(self) -> Result<AnnotatedResult<ApiObject>, Box<dyn Error>> {
         let mut annotator = Annotator::new();
-        use CsiObject::*;
+        use CsiObject as O;
         let api_object = match self {
-            Widgets(widgets) => {
+            O::Widgets(widgets) => {
                 let results: Vec<_> = widgets
                     .into_iter()
                     .filter_map(|w| {
@@ -535,9 +535,9 @@ impl MsgConvInput {
 }
 
 fn convert_max_short_msg_to_source(input: MsgConvInput) -> CsiResult<MsgConvOutput> {
-    use StructuredShortMessage::*;
+    use StructuredShortMessage as M;
     let res = match input.msg.to_structured() {
-        NoteOn {
+        M::NoteOn {
             channel,
             key_number,
             velocity,
@@ -555,7 +555,7 @@ fn convert_max_short_msg_to_source(input: MsgConvInput) -> CsiResult<MsgConvOutp
                 }
             }
         }
-        NoteOff {
+        M::NoteOff {
             channel,
             key_number,
             velocity,
@@ -573,7 +573,7 @@ fn convert_max_short_msg_to_source(input: MsgConvInput) -> CsiResult<MsgConvOutp
                 }
             }
         }
-        PolyphonicKeyPressure {
+        M::PolyphonicKeyPressure {
             channel,
             key_number,
             pressure_amount,
@@ -593,7 +593,7 @@ fn convert_max_short_msg_to_source(input: MsgConvInput) -> CsiResult<MsgConvOutp
                 }
             }
         }
-        ControlChange {
+        M::ControlChange {
             channel,
             controller_number,
             control_value,
@@ -613,7 +613,7 @@ fn convert_max_short_msg_to_source(input: MsgConvInput) -> CsiResult<MsgConvOutp
                 }
             }
         }
-        ProgramChange {
+        M::ProgramChange {
             channel,
             program_number,
         } => {
@@ -629,7 +629,7 @@ fn convert_max_short_msg_to_source(input: MsgConvInput) -> CsiResult<MsgConvOutp
                 }
             }
         }
-        ChannelPressure {
+        M::ChannelPressure {
             channel,
             pressure_amount,
         } => {
@@ -645,7 +645,7 @@ fn convert_max_short_msg_to_source(input: MsgConvInput) -> CsiResult<MsgConvOutp
                 }
             }
         }
-        PitchBendChange {
+        M::PitchBendChange {
             channel,
             pitch_bend_value,
         } => {

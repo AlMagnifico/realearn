@@ -479,11 +479,11 @@ pub enum ChangeHint {
 
 impl ChangeHint {
     pub fn affected_kinds(&self) -> EnumSet<PotFilterKind> {
-        use ChangeHint::*;
+        use ChangeHint as H;
         match self {
-            Normal | TotalRefresh => EnumSet::all(),
-            SearchExpression => EnumSet::empty(),
-            Filter(changed_kind) => changed_kind.dependent_kinds().collect(),
+            H::Normal | H::TotalRefresh => EnumSet::all(),
+            H::SearchExpression => EnumSet::empty(),
+            H::Filter(changed_kind) => changed_kind.dependent_kinds().collect(),
         }
     }
 }

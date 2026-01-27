@@ -159,10 +159,10 @@ impl KompleteDatabase {
         filters: &Filters,
     ) -> InnerFilterItemCollections {
         let mut api_collections = InnerFilterItemCollections::empty();
-        use PotFilterKind::*;
+        use PotFilterKind as K;
         for kind in affected_kinds {
             let items = match kind {
-                Bank => self.build_parent_filter_items(
+                K::Bank => self.build_parent_filter_items(
                     &self
                         .nks_filter_item_collections
                         .bank_collections
@@ -171,17 +171,17 @@ impl KompleteDatabase {
                     excludes,
                     kind,
                 ),
-                SubBank => self.build_child_filter_items(
+                K::SubBank => self.build_child_filter_items(
                     &self
                         .nks_filter_item_collections
                         .bank_collections
                         .child_items,
                     &non_empty_filters.banks_and_sub_banks,
                     excludes,
-                    filters.get(Bank),
+                    filters.get(K::Bank),
                     kind,
                 ),
-                Category => self.build_parent_filter_items(
+                K::Category => self.build_parent_filter_items(
                     &self
                         .nks_filter_item_collections
                         .category_collections
@@ -190,17 +190,17 @@ impl KompleteDatabase {
                     excludes,
                     kind,
                 ),
-                SubCategory => self.build_child_filter_items(
+                K::SubCategory => self.build_child_filter_items(
                     &self
                         .nks_filter_item_collections
                         .category_collections
                         .child_items,
                     &non_empty_filters.categories_and_sub_categories,
                     excludes,
-                    filters.get(Category),
+                    filters.get(K::Category),
                     kind,
                 ),
-                Mode => self.build_simple_filter_items(
+                K::Mode => self.build_simple_filter_items(
                     &self.nks_filter_item_collections.modes,
                     &non_empty_filters.modes,
                 ),
@@ -1147,14 +1147,14 @@ impl PresetDb {
             if exclude_list.is_empty(kind) {
                 continue;
             }
-            use PotFilterKind::*;
+            use PotFilterKind as K;
             let selector = match kind {
-                Bank | SubBank => "i.bank_chain_id",
-                Category | SubCategory => {
+                K::Bank | K::SubBank => "i.bank_chain_id",
+                K::Category | K::SubCategory => {
                     sql.more_from(CATEGORY_JOIN);
                     "ic.category_id"
                 }
-                Mode => {
+                K::Mode => {
                     sql.more_from(MODE_JOIN);
                     "im.mode_id"
                 }
@@ -1169,7 +1169,7 @@ impl PresetDb {
                     // For parent filter excludes such as banks and categories, we also need to
                     // exclude the child filters.
                     match kind {
-                        Bank => {
+                        K::Bank => {
                             sql.where_and_with_param(
                                 r#"
                                 i.bank_chain_id NOT IN (
@@ -1181,7 +1181,7 @@ impl PresetDb {
                                 id,
                             );
                         }
-                        Category => {
+                        K::Category => {
                             sql.where_and_with_param(
                                 r#"
                                 ic.category_id NOT IN (
