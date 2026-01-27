@@ -40,6 +40,8 @@ use std::rc::Rc;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UnitData {
+    #[serde(default = "bool_true", skip_serializing_if = "is_bool_true")]
+    pub enabled: bool,
     // Since ReaLearn 1.12.0-pre18
     #[serde(
         default,
@@ -407,6 +409,7 @@ impl Default for UnitData {
         Self {
             version: Some(BackboneShell::version().clone()),
             id: None,
+            enabled: true,
             name: None,
             let_matched_events_through: unit_defaults::LET_MATCHED_EVENTS_THROUGH,
             let_unmatched_events_through: unit_defaults::LET_UNMATCHED_EVENTS_THROUGH,
@@ -488,6 +491,7 @@ impl UnitData {
         let unit = session.unit().borrow();
         let plugin_params = unit.parameter_manager().params();
         UnitData {
+            enabled: session.is_enabled(),
             version: Some(BackboneShell::version().clone()),
             id: Some(session.unit_key().to_string()),
             name: session.name.clone(),
@@ -847,6 +851,7 @@ impl UnitData {
         if let Some(id) = &self.id {
             let _ = session.change(UnitCommand::SetUnitKey(id.clone()));
         };
+        let _ = session.change(UnitCommand::SetEnabled(self.enabled));
         let _ = session.change(UnitCommand::SetUnitName(self.name.clone()));
         let _ = session.change(UnitCommand::SetInstanceTrack(self.instance_track.clone()));
         let _ = session.change(UnitCommand::SetInstanceFx(self.instance_fx.clone()));

@@ -82,6 +82,7 @@ pub trait UnitUi {
 pub struct UnitModel {
     instance_id: InstanceId,
     unit_id: UnitId,
+    enabled: bool,
     /// Persisted and can be user-customized. Should be
     /// unique but if not it's not a big deal, then it won't crash but the user can't be sure which
     /// unit will be picked. Most relevant for HTTP/WS API.
@@ -261,6 +262,7 @@ impl UnitModel {
             unit_key: initial_unit_key,
             instance_id,
             unit_id,
+            enabled: true,
             let_matched_events_through: prop(unit_defaults::LET_MATCHED_EVENTS_THROUGH),
             let_unmatched_events_through: prop(unit_defaults::LET_UNMATCHED_EVENTS_THROUGH),
             stay_active_when_project_in_background: prop(
@@ -342,6 +344,10 @@ impl UnitModel {
                 .set_control_unit_palette_color(auto_unit.controller_palette_color);
         }
         model
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
     }
 
     pub fn name(&self) -> Option<&str> {
@@ -1130,6 +1136,14 @@ impl UnitModel {
         use UnitCommand as C;
         use UnitProp as P;
         let affected = match cmd {
+            C::ToggleEnabled => {
+                self.enabled = !self.enabled;
+                Some(One(UnitProp::Enabled))
+            }
+            C::SetEnabled(enabled) => {
+                self.enabled = enabled;
+                Some(One(UnitProp::Enabled))
+            }
             C::SetUnitName(unit_name) => {
                 self.name = unit_name;
                 Some(One(UnitProp::UnitName))
@@ -1299,7 +1313,10 @@ impl UnitModel {
                     let mut model = model.borrow_mut();
                     match &affected {
                         One(
-                            WantsKeyboardInput | StreamDeckDeviceId | MatchEvenInactiveMappings,
+                            Enabled
+                            | WantsKeyboardInput
+                            | StreamDeckDeviceId
+                            | MatchEvenInactiveMappings,
                         ) => {
                             model.sync_settings();
                         }
@@ -2633,6 +2650,7 @@ impl UnitModel {
 
     fn sync_settings(&self) {
         let settings = BasicSettings {
+            unit_enabled: self.enabled,
             control_input: self.control_input(),
             wants_keyboard_input: self.wants_keyboard_input,
             match_even_inactive_mappings: self.match_even_inactive_mappings,
@@ -3054,6 +3072,8 @@ pub fn reaper_supports_global_midi_filter() -> bool {
 
 #[allow(dead_code)]
 pub enum UnitCommand {
+    ToggleEnabled,
+    SetEnabled(bool),
     SetUnitName(Option<String>),
     SetUnitKey(String),
     SetUnitTags(Vec<Tag>),
@@ -3067,6 +3087,7 @@ pub enum UnitCommand {
 }
 
 pub enum UnitProp {
+    Enabled,
     UnitName,
     UnitKey,
     UnitTags,

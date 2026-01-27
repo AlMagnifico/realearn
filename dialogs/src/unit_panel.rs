@@ -33,10 +33,15 @@ pub fn create(
             ids.named_id("ID_MAIN_PANEL_STATUS_2_TEXT"),
             create_rect(text_line_left, 5 + line_spacing, text_line_width, 9),
         ) + NOT_WS_GROUP,
+        context.checkbox(
+            "",
+            ids.named_id("IDC_UNIT_ENABLED_CHECK_BOX"),
+            create_rect(2, 7 + line_spacing, 10, 14),
+        ) + WS_TABSTOP,
         pushbutton(
             "Unit",
             ids.named_id("IDC_UNIT_BUTTON"),
-            create_rect(8, 5 + line_spacing, 76, 14),
+            create_rect(17, 5 + line_spacing, 65, 14),
         ),
         pushbutton(
             "Unit data...",

@@ -134,7 +134,7 @@ impl InstancePanel {
         }
         let menu = {
             use swell_ui::menu_tree::*;
-            let shell = self.shell().unwrap();
+            let shell = self.shell().expect("shell should be available");
             let additional_unit_models = shell.additional_unit_models();
             let displayed_unit_id = self.displayed_unit_id.get();
             let main_unit_model = shell.main_unit_shell().model().borrow();

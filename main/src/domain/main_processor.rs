@@ -2932,6 +2932,7 @@ pub enum NormalMainTask {
 
 #[derive(Copy, Clone, Debug, Default)]
 pub struct BasicSettings {
+    pub unit_enabled: bool,
     pub control_input: ControlInput,
     pub wants_keyboard_input: bool,
     pub streamdeck_device_id: Option<StreamDeckDeviceId>,
@@ -4422,7 +4423,8 @@ fn determine_control_globally_enabled(
     settings: &BasicSettings,
     project_options: ProjectOptions,
 ) -> bool {
-    context.containing_fx().is_enabled()
+    settings.unit_enabled
+        && context.containing_fx().is_enabled()
         && passes_background_project_check(
             context,
             settings.stay_active_when_project_in_background,
@@ -4435,7 +4437,8 @@ fn determine_feedback_globally_enabled(
     settings: &BasicSettings,
     project_options: ProjectOptions,
 ) -> bool {
-    (settings.feedback_output.is_some() || settings.streamdeck_device_id.is_some())
+    settings.unit_enabled
+        && (settings.feedback_output.is_some() || settings.streamdeck_device_id.is_some())
         && context.containing_fx().is_enabled()
         && track_arm_conditions_are_met(context, settings)
         && passes_background_project_check(

@@ -296,31 +296,32 @@ pub mod root {
     pub const ID_MAPPING_ACTIVATION_SETTING_2_CHECK_BOX: u32 = 30226;
     pub const ID_MAPPING_ACTIVATION_EDIT_CONTROL: u32 = 30227;
     pub const ID_INSTANCE_PANEL: u32 = 30229;
-    pub const ID_MAIN_PANEL: u32 = 30236;
+    pub const ID_MAIN_PANEL: u32 = 30237;
     pub const ID_MAIN_PANEL_STATUS_1_TEXT: u32 = 30231;
     pub const ID_MAIN_PANEL_STATUS_2_TEXT: u32 = 30232;
-    pub const IDC_UNIT_BUTTON: u32 = 30233;
-    pub const IDC_EDIT_TAGS_BUTTON: u32 = 30234;
-    pub const ID_MAIN_PANEL_VERSION_TEXT: u32 = 30235;
-    pub const ID_YAML_EDITOR_PANEL: u32 = 30241;
+    pub const IDC_UNIT_ENABLED_CHECK_BOX: u32 = 30233;
+    pub const IDC_UNIT_BUTTON: u32 = 30234;
+    pub const IDC_EDIT_TAGS_BUTTON: u32 = 30235;
+    pub const ID_MAIN_PANEL_VERSION_TEXT: u32 = 30236;
+    pub const ID_YAML_EDITOR_PANEL: u32 = 30242;
     #[allow(dead_code)]
-    pub const ID_YAML_TEXT_EDITOR_BUTTON: u32 = 30237;
-    pub const ID_YAML_EDIT_CONTROL: u32 = 30238;
-    pub const ID_YAML_HELP_BUTTON: u32 = 30239;
-    pub const ID_YAML_EDIT_INFO_TEXT: u32 = 30240;
+    pub const ID_YAML_TEXT_EDITOR_BUTTON: u32 = 30238;
+    pub const ID_YAML_EDIT_CONTROL: u32 = 30239;
+    pub const ID_YAML_HELP_BUTTON: u32 = 30240;
+    pub const ID_YAML_EDIT_INFO_TEXT: u32 = 30241;
     #[allow(dead_code)]
-    pub const ID_EMPTY_PANEL: u32 = 30242;
+    pub const ID_EMPTY_PANEL: u32 = 30243;
     #[allow(dead_code)]
-    pub const ID_SETUP_PANEL: u32 = 30243;
-    pub const ID_SETUP_INTRO_TEXT_1: u32 = 30244;
-    pub const ID_SETUP_INTRO_TEXT_2: u32 = 30245;
-    pub const ID_SETUP_ADD_PLAYTIME_TOOLBAR_BUTTON: u32 = 30246;
-    pub const ID_SETUP_SEND_ERRORS_TO_DEV: u32 = 30247;
-    pub const ID_SETUP_SHOW_ERRORS_IN_CONSOLE: u32 = 30248;
-    pub const ID_SETUP_NOTIFY_ABOUT_UPDATES: u32 = 30249;
-    pub const ID_SETUP_COMMENT: u32 = 30250;
-    pub const ID_SETUP_TIP_TEXT: u32 = 30251;
-    pub const ID_SETUP_PANEL_OK: u32 = 30252;
-    pub const ID_COLOR_PANEL: u32 = 30253;
-    pub const ID_HIDDEN_PANEL: u32 = 30254;
+    pub const ID_SETUP_PANEL: u32 = 30244;
+    pub const ID_SETUP_INTRO_TEXT_1: u32 = 30245;
+    pub const ID_SETUP_INTRO_TEXT_2: u32 = 30246;
+    pub const ID_SETUP_ADD_PLAYTIME_TOOLBAR_BUTTON: u32 = 30247;
+    pub const ID_SETUP_SEND_ERRORS_TO_DEV: u32 = 30248;
+    pub const ID_SETUP_SHOW_ERRORS_IN_CONSOLE: u32 = 30249;
+    pub const ID_SETUP_NOTIFY_ABOUT_UPDATES: u32 = 30250;
+    pub const ID_SETUP_COMMENT: u32 = 30251;
+    pub const ID_SETUP_TIP_TEXT: u32 = 30252;
+    pub const ID_SETUP_PANEL_OK: u32 = 30253;
+    pub const ID_COLOR_PANEL: u32 = 30254;
+    pub const ID_HIDDEN_PANEL: u32 = 30255;
 }

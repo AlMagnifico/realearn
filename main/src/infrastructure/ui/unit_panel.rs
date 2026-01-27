@@ -23,7 +23,7 @@ use crate::infrastructure::server::http::{
 };
 use crate::infrastructure::ui::instance_panel::InstancePanel;
 use crate::infrastructure::ui::util::{header_panel_height, parse_tags_from_csv};
-use anyhow::Context;
+use anyhow::{anyhow, bail, Context};
 use base::SoundPlayer;
 use helgobox_allocator::undesired_allocation_count;
 use helgobox_api::runtime::InstanceInfoEvent;
@@ -199,21 +199,27 @@ impl UnitPanel {
         });
     }
 
-    fn do_with_session<R>(&self, f: impl FnOnce(&UnitModel) -> R) -> Result<R, &'static str> {
+    fn do_with_session<R>(&self, f: impl FnOnce(&UnitModel) -> R) -> anyhow::Result<R> {
         match self.unit_model.upgrade() {
-            None => Err("session not available anymore"),
+            None => Err(anyhow!("session not available anymore")),
             Some(session) => Ok(f(&session.borrow())),
         }
     }
 
-    fn do_with_session_mut<R>(
-        &self,
-        f: impl FnOnce(&mut UnitModel) -> R,
-    ) -> Result<R, &'static str> {
+    fn do_with_session_mut<R>(&self, f: impl FnOnce(&mut UnitModel) -> R) -> anyhow::Result<R> {
         match self.unit_model.upgrade() {
-            None => Err("session not available anymore"),
+            None => Err(anyhow!("session not available anymore")),
             Some(session) => Ok(f(&mut session.borrow_mut())),
         }
+    }
+
+    fn enable_or_disable_unit(&self) -> anyhow::Result<()> {
+        self.unit_model
+            .upgrade()
+            .context("upgrade unit model")?
+            .borrow_mut()
+            .change_with_notification(UnitCommand::ToggleEnabled, None, self.unit_model.clone());
+        Ok(())
     }
 
     pub fn invalidate_instance_tags(&self) {
@@ -221,7 +227,8 @@ impl UnitPanel {
     }
 
     fn invalidate_all_controls(&self) {
-        self.invalidate_unit_button().unwrap();
+        let _ = self.invalidate_unit_enabled_checkbox();
+        let _ = self.invalidate_unit_button();
         let _ = self.invalidate_version_text();
         self.invalidate_status_1_text();
         self.invalidate_status_2_text();
@@ -229,8 +236,18 @@ impl UnitPanel {
 
     pub fn notify_units_changed(&self) {
         if self.view.window().is_some() {
-            self.invalidate_unit_button().unwrap();
+            let _ = self.invalidate_unit_enabled_checkbox();
+            let _ = self.invalidate_unit_button();
         }
+    }
+
+    fn invalidate_unit_enabled_checkbox(&self) -> anyhow::Result<()> {
+        self.do_with_session(|session| {
+            self.view
+                .require_control(root::IDC_UNIT_ENABLED_CHECK_BOX)
+                .set_checked(session.is_enabled());
+        })?;
+        Ok(())
     }
 
     fn invalidate_unit_button(&self) -> anyhow::Result<()> {
@@ -323,14 +340,15 @@ impl UnitPanel {
         self: SharedView<Self>,
         affected: Affected<UnitProp>,
         initiator: Option<u32>,
-    ) {
+    ) -> anyhow::Result<()> {
         self.panel_manager
             .borrow()
             .handle_affected(&affected, initiator);
         self.mapping_rows_panel
             .handle_affected(&affected, initiator);
         self.header_panel.handle_affected(&affected, initiator);
-        self.handle_affected_own(affected);
+        self.handle_affected_own(affected)?;
+        Ok(())
     }
 
     fn handle_internal_info_event(self: SharedView<Self>, event: &InternalInfoEvent) {
@@ -350,7 +368,10 @@ impl UnitPanel {
             .notify_about_instance_info_event(self.instance_id, event);
     }
 
-    fn handle_affected_own(self: SharedView<Self>, affected: Affected<UnitProp>) {
+    fn handle_affected_own(
+        self: SharedView<Self>,
+        affected: Affected<UnitProp>,
+    ) -> anyhow::Result<()> {
         use Affected::*;
         use UnitProp::*;
         // Handle even if closed
@@ -373,11 +394,15 @@ impl UnitPanel {
         }
         // Handle only if open
         if !self.is_open() {
-            return;
+            return Ok(());
         }
         match affected {
             One(InstanceTrack | InstanceFx) => {
                 self.invalidate_status_2_text();
+            }
+            One(Enabled) => {
+                let _ = self.invalidate_unit_enabled_checkbox();
+                let _ = self.invalidate_unit_button();
             }
             One(UnitName) => {
                 let _ = self.invalidate_unit_button();
@@ -390,6 +415,7 @@ impl UnitPanel {
             }
             _ => {}
         }
+        Ok(())
     }
 
     fn handle_changed_parameters(&self, session: &UnitModel) {
@@ -425,7 +451,7 @@ impl UnitPanel {
             .expect("instance panel doesn't exist anymore")
     }
 
-    fn edit_unit_data(&self) -> Result<(), &'static str> {
+    fn edit_unit_data(&self) -> anyhow::Result<()> {
         let (initial_key, initial_name, initial_tags_as_csv) = self.do_with_session(|session| {
             (
                 session.unit_key().to_owned(),
@@ -452,7 +478,7 @@ impl UnitPanel {
         let split: Vec<_> = csv.to_str().split('|').collect();
         let (unit_key, unit_name, tags_as_csv) = match split.as_slice() {
             [unit_key, unit_name, tags_as_csv] => (unit_key, unit_name, tags_as_csv),
-            _ => return Err("couldn't split result"),
+            _ => bail!("couldn't split result"),
         };
         // Take care of tags
         if tags_as_csv != &initial_tags_as_csv {
@@ -529,6 +555,9 @@ impl View for UnitPanel {
 
     fn button_clicked(self: SharedView<Self>, resource_id: u32) {
         match resource_id {
+            root::IDC_UNIT_ENABLED_CHECK_BOX => {
+                let _ = self.enable_or_disable_unit();
+            }
             root::IDC_UNIT_BUTTON => {
                 // Yes, putting this button into the instance panel would make more sense logically
                 // but since the unit panel completely covers the instance panel, the button would
@@ -605,7 +634,7 @@ impl UnitUi for Weak<UnitPanel> {
             _ => {}
         }
         // Update primary GUI
-        upgrade_panel(self).handle_affected(affected, initiator);
+        let _ = upgrade_panel(self).handle_affected(affected, initiator);
     }
 
     fn handle_internal_info_event(&self, event: &InternalInfoEvent) {
@@ -661,6 +690,9 @@ fn build_unit_label_internal(
     }
     let label = unit_model.name_or_key();
     write!(&mut s, ": {label}")?;
+    if !unit_model.is_enabled() {
+        write!(&mut s, " (disabled)")?;
+    }
     if !unit_model.tags().is_empty() {
         write!(&mut s, " [{}]", format_tags_as_csv(unit_model.tags()))?;
     }

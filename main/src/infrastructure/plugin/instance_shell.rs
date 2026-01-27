@@ -196,6 +196,16 @@ impl InstanceShell {
         once(self.main_unit_shell().model().clone()).chain(additional_unit_models)
     }
 
+    pub fn find_unit_model_by_id(&self, unit_id: Option<UnitId>) -> Option<SharedUnitModel> {
+        match unit_id {
+            None => Some(self.main_unit_shell.model().clone()),
+            Some(unit_id) => self
+                .additional_unit_models()
+                .into_iter()
+                .find(|m| m.borrow().unit_id() == unit_id),
+        }
+    }
+
     pub fn additional_unit_models(&self) -> Vec<SharedUnitModel> {
         blocking_read_lock(&self.additional_unit_shells, "additional_unit_models")
             .iter()

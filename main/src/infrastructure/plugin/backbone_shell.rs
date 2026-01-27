@@ -2797,13 +2797,13 @@ impl UnitContainer for BackboneShell {
         let mut activated_inverse_tags = HashSet::default();
         for unit_info in self.unit_infos.borrow().iter() {
             // Don't leave the context (current instance)
-            if unit_info.instance_id == args.common.initiator_instance_id {
+            if unit_info.instance_id != args.common.initiator_instance_id {
                 continue;
             }
             let Some(unit_model) = unit_info.unit_model.upgrade() else {
                 continue;
             };
-            let unit_model = unit_model.borrow();
+            let mut unit_model = unit_model.borrow_mut();
             // Don't touch ourselves.
             if unit_model.unit_id() == args.common.initiator_unit_id {
                 continue;
@@ -2824,13 +2824,11 @@ impl UnitContainer for BackboneShell {
                 activated_inverse_tags.extend(relevant_tags.iter().cloned());
             }
             let enable = if args.is_enable { flag } else { !flag };
-            // TODO-high CONTINUE Enable/disable units! This is where it gets interesting.
-            // let fx = context.containing_fx();
-            // if enable {
-            //     let _ = fx.enable();
-            // } else {
-            //     let _ = fx.disable();
-            // }
+            unit_model.change_with_notification(
+                UnitCommand::SetEnabled(enable),
+                None,
+                unit_info.unit_model.clone(),
+            );
         }
         if args.exclusivity == Exclusivity::Exclusive && !args.is_enable {
             Some(activated_inverse_tags)
