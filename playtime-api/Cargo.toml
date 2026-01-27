@@ -35,3 +35,6 @@ strum.workspace = true
 num_enum.workspace = true
 # For UTF-8 paths
 camino = { workspace = true, features = ["serde1"] }
+
+[lints.clippy]
+enum_glob_use = "deny"

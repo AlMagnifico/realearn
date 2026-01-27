@@ -36,3 +36,6 @@ heck.workspace = true
 # For formatting generated Luau Type definitions
 stylua = { workspace = true, features = ["luau"] }
 anyhow.workspace = true
+
+[lints.clippy]
+enum_glob_use = "deny"

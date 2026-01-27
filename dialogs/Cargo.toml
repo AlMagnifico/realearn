@@ -8,3 +8,6 @@ publish = false
 [dependencies]
 derive_more.workspace = true
 indexmap.workspace = true
+
+[lints.clippy]
+enum_glob_use = "deny"

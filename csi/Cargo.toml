@@ -11,3 +11,6 @@ helgoboss-midi.workspace = true
 base.workspace = true
 helgobox-api.workspace = true
 derive_more.workspace = true
+
+[lints.clippy]
+enum_glob_use = "deny"

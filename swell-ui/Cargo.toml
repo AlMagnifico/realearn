@@ -31,3 +31,6 @@ objc2.workspace = true
 # [target.'cfg(target_os = "linux")'.dependencies]
 # gdk-sys = "0.17.0"
 # gdkx11-sys = "0.17.0"
+
+[lints.clippy]
+enum_glob_use = "deny"

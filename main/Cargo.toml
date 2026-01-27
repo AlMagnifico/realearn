@@ -251,3 +251,7 @@ sysinfo.workspace = true
 [lib]
 name = "helgobox"
 crate-type = ["cdylib"]
+
+
+[lints.clippy]
+enum_glob_use = "deny"

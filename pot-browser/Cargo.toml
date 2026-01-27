@@ -35,3 +35,7 @@ rfd.workspace = true
 [target.'cfg(not(all(target_os = "windows", target_arch = "x86")))'.dependencies]
 # This doesn't work on win32
 opener = { workspace = true, features = ["reveal"] }
+
+
+[lints.clippy]
+enum_glob_use = "deny"

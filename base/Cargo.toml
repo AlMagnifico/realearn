@@ -40,3 +40,6 @@ fragile.workspace = true
 [target.'cfg(target_os = "macos")'.dependencies]
 # For not letting device_query panic when macOS accessibility permissions not granted
 macos-accessibility-client.workspace = true
+
+[lints.clippy]
+enum_glob_use = "deny"

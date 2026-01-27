@@ -9,3 +9,6 @@ publish = false
 [dependencies]
 resvg = { workspace = true, features = ["system-fonts"] }
 anyhow.workspace = true
+
+[lints.clippy]
+enum_glob_use = "deny"

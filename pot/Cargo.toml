@@ -43,3 +43,6 @@ nanoid.workspace = true
 chrono.workspace = true
 anyhow.workspace = true
 camino.workspace = true
+
+[lints.clippy]
+enum_glob_use = "deny"
