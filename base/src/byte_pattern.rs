@@ -16,12 +16,12 @@ impl BytePattern {
     }
 
     pub fn matches(&self, bytes: &[u8]) -> bool {
-        use PatternByte::*;
+        use PatternByte as B;
         let mut byte_iter = bytes.iter();
         let mut last_was_multi = false;
         for pattern_byte in &self.bytes {
             let matches = match pattern_byte {
-                Fixed(expected_byte) => {
+                B::Fixed(expected_byte) => {
                     if last_was_multi {
                         // Last pattern byte was multi
                         last_was_multi = false;
@@ -33,12 +33,12 @@ impl BytePattern {
                         byte_iter.next().is_some_and(|b| b == expected_byte)
                     }
                 }
-                Single => {
+                B::Single => {
                     last_was_multi = false;
                     // We need to have an actual byte but it doesn't matter which one!
                     byte_iter.next().is_some()
                 }
-                Multi => {
+                B::Multi => {
                     last_was_multi = true;
                     // Match even if no actual byte left!
                     true
