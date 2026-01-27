@@ -34,42 +34,42 @@ impl Serialize for MatrixSequenceEvent {
     where
         S: Serializer,
     {
-        use MatrixSequenceMessage::*;
+        use MatrixSequenceMessage as M;
         match self.message {
-            PanicMatrix => {
+            M::PanicMatrix => {
                 let mut seq = serializer.serialize_tuple(2)?;
                 seq.serialize_element(&self.pulse_diff)?;
                 seq.serialize_element(&0u8)?;
                 seq.end()
             }
-            StopMatrix => {
+            M::StopMatrix => {
                 let mut seq = serializer.serialize_tuple(2)?;
                 seq.serialize_element(&self.pulse_diff)?;
                 seq.serialize_element(&1u8)?;
                 seq.end()
             }
-            PanicColumn(m) => {
+            M::PanicColumn(m) => {
                 let mut seq = serializer.serialize_tuple(3)?;
                 seq.serialize_element(&self.pulse_diff)?;
                 seq.serialize_element(&2u8)?;
                 seq.serialize_element(&m.index)?;
                 seq.end()
             }
-            StopColumn(m) => {
+            M::StopColumn(m) => {
                 let mut seq = serializer.serialize_tuple(3)?;
                 seq.serialize_element(&self.pulse_diff)?;
                 seq.serialize_element(&3u8)?;
                 seq.serialize_element(&m.index)?;
                 seq.end()
             }
-            StartScene(m) => {
+            M::StartScene(m) => {
                 let mut seq = serializer.serialize_tuple(3)?;
                 seq.serialize_element(&self.pulse_diff)?;
                 seq.serialize_element(&4u8)?;
                 seq.serialize_element(&m.index)?;
                 seq.end()
             }
-            PanicSlot(m) => {
+            M::PanicSlot(m) => {
                 let mut seq = serializer.serialize_tuple(4)?;
                 seq.serialize_element(&self.pulse_diff)?;
                 seq.serialize_element(&5u8)?;
@@ -77,7 +77,7 @@ impl Serialize for MatrixSequenceEvent {
                 seq.serialize_element(&m.row_index)?;
                 seq.end()
             }
-            StartSlot(m) => {
+            M::StartSlot(m) => {
                 let mut seq = serializer.serialize_tuple(5)?;
                 seq.serialize_element(&self.pulse_diff)?;
                 seq.serialize_element(&6u8)?;
@@ -87,7 +87,7 @@ impl Serialize for MatrixSequenceEvent {
                 seq.end()
             }
 
-            StopSlot(m) => {
+            M::StopSlot(m) => {
                 let mut seq = serializer.serialize_tuple(4)?;
                 seq.serialize_element(&self.pulse_diff)?;
                 seq.serialize_element(&7u8)?;
@@ -112,7 +112,7 @@ impl<'de> Visitor<'de> for MatrixSequenceEventVisitor {
     where
         A: SeqAccess<'de>,
     {
-        use MatrixSequenceMessage::*;
+        use MatrixSequenceMessage as M;
         macro_rules! col(() => {
             MatrixSequenceColumnMessage {
                 index: seq
@@ -144,13 +144,13 @@ impl<'de> Visitor<'de> for MatrixSequenceEventVisitor {
             .next_element()?
             .ok_or(Error::custom("expected message type"))?;
         let message = match msg_type {
-            0 => PanicMatrix,
-            1 => StopMatrix,
-            2 => PanicColumn(col!()),
-            3 => StopColumn(col!()),
-            4 => StartScene(row!()),
-            5 => PanicSlot(slot!()),
-            6 => StartSlot(MatrixSequenceStartSlotMessage {
+            0 => M::PanicMatrix,
+            1 => M::StopMatrix,
+            2 => M::PanicColumn(col!()),
+            3 => M::StopColumn(col!()),
+            4 => M::StartScene(row!()),
+            5 => M::PanicSlot(slot!()),
+            6 => M::StartSlot(MatrixSequenceStartSlotMessage {
                 column_index: seq
                     .next_element()?
                     .ok_or(Error::custom("expected slot column index"))?,
@@ -160,7 +160,7 @@ impl<'de> Visitor<'de> for MatrixSequenceEventVisitor {
                 // Full velocity by default
                 velocity: seq.next_element()?.unwrap_or(1.0),
             }),
-            7 => StopSlot(slot!()),
+            7 => M::StopSlot(slot!()),
             _ => return Err(Error::custom(format!("unknown message type {msg_type}"))),
         };
         let event = MatrixSequenceEvent {

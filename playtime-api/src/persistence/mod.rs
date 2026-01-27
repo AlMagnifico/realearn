@@ -491,9 +491,9 @@ impl MatrixClipRecordSettings {
         time_signature: TimeSignature,
         downbeat: DurationInBeats,
     ) -> ClipTimeBase {
-        use ClipRecordTimeBase::*;
+        use ClipRecordTimeBase as B;
         let beat_based = match self.time_base {
-            DeriveFromRecordTiming => match self.start_timing {
+            B::DeriveFromRecordTiming => match self.start_timing {
                 ClipRecordStartTiming::LikeClipPlayStartTiming => match initial_play_start_timing {
                     ClipPlayStartTiming::Immediately => false,
                     ClipPlayStartTiming::Quantized(_) => true,
@@ -501,8 +501,8 @@ impl MatrixClipRecordSettings {
                 ClipRecordStartTiming::Immediately => false,
                 ClipRecordStartTiming::Quantized(_) => true,
             },
-            Time => false,
-            Beat => true,
+            B::Time => false,
+            B::Beat => true,
         };
         if beat_based {
             #[allow(deprecated)]
@@ -629,26 +629,26 @@ impl ClipRecordStartTiming {
         initial_play_start_timing: ClipPlayStartTiming,
         current_play_start_timing: ClipPlayStartTiming,
     ) -> Option<ClipPlayStartTiming> {
-        use ClipRecordStartTiming::*;
+        use ClipRecordStartTiming as T;
         match self {
-            LikeClipPlayStartTiming => {
+            T::LikeClipPlayStartTiming => {
                 if initial_play_start_timing == current_play_start_timing {
                     None
                 } else {
                     Some(initial_play_start_timing)
                 }
             }
-            Immediately => Some(ClipPlayStartTiming::Immediately),
-            Quantized(q) => Some(ClipPlayStartTiming::Quantized(*q)),
+            T::Immediately => Some(ClipPlayStartTiming::Immediately),
+            T::Quantized(q) => Some(ClipPlayStartTiming::Quantized(*q)),
         }
     }
 
     pub fn suggests_beat_based_material(&self, play_start_timing: ClipPlayStartTiming) -> bool {
-        use ClipRecordStartTiming::*;
+        use ClipRecordStartTiming as T;
         match self {
-            LikeClipPlayStartTiming => play_start_timing.suggests_beat_based_material(),
-            Immediately => false,
-            Quantized(_) => true,
+            T::LikeClipPlayStartTiming => play_start_timing.suggests_beat_based_material(),
+            T::Immediately => false,
+            T::Quantized(_) => true,
         }
     }
 }
@@ -677,16 +677,16 @@ impl ClipRecordStopTiming {
         initial_play_start_timing: ClipPlayStartTiming,
         current_play_start_timing: ClipPlayStartTiming,
     ) -> Option<ClipPlayStopTiming> {
-        use ClipRecordStopTiming::*;
+        use ClipRecordStopTiming as T;
         match self {
-            LikeClipRecordStartTiming => record_start_timing
+            T::LikeClipRecordStartTiming => record_start_timing
                 .derive_play_start_timing(initial_play_start_timing, current_play_start_timing)
                 .map(|play_start_timing| match play_start_timing {
                     ClipPlayStartTiming::Immediately => ClipPlayStopTiming::Immediately,
                     ClipPlayStartTiming::Quantized(q) => ClipPlayStopTiming::Quantized(q),
                 }),
-            Immediately => Some(ClipPlayStopTiming::Immediately),
-            Quantized(q) => Some(ClipPlayStopTiming::Quantized(*q)),
+            T::Immediately => Some(ClipPlayStopTiming::Immediately),
+            T::Quantized(q) => Some(ClipPlayStopTiming::Quantized(*q)),
         }
     }
 }
@@ -726,10 +726,10 @@ impl Default for ClipPlayStartTiming {
 
 impl ClipPlayStartTiming {
     pub fn suggests_beat_based_material(&self) -> bool {
-        use ClipPlayStartTiming::*;
+        use ClipPlayStartTiming as T;
         match self {
-            Immediately => false,
-            Quantized(_) => true,
+            T::Immediately => false,
+            T::Quantized(_) => true,
         }
     }
 }
@@ -755,15 +755,15 @@ impl Default for ClipPlayStopTiming {
 
 impl ClipPlayStopTiming {
     pub fn resolve(&self, start_timing: ClipPlayStartTiming) -> ResolvedClipPlayStopTiming {
-        use ClipPlayStopTiming::*;
+        use ClipPlayStopTiming as T;
         match self {
-            LikeClipStartTiming => match start_timing {
+            T::LikeClipStartTiming => match start_timing {
                 ClipPlayStartTiming::Immediately => ResolvedClipPlayStopTiming::Immediately,
                 ClipPlayStartTiming::Quantized(q) => ResolvedClipPlayStopTiming::Quantized(q),
             },
-            Immediately => ResolvedClipPlayStopTiming::Immediately,
-            Quantized(q) => ResolvedClipPlayStopTiming::Quantized(*q),
-            UntilEndOfClip => ResolvedClipPlayStopTiming::UntilEndOfClip,
+            T::Immediately => ResolvedClipPlayStopTiming::Immediately,
+            T::Quantized(q) => ResolvedClipPlayStopTiming::Quantized(*q),
+            T::UntilEndOfClip => ResolvedClipPlayStopTiming::UntilEndOfClip,
         }
     }
 }
