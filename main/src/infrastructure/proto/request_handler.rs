@@ -25,8 +25,8 @@ use crate::infrastructure::proto::{
     OpenTrackFxRequest, ProveAuthenticityReply, ProveAuthenticityRequest, SaveControllerRequest,
     SaveCustomCompartmentDataRequest, SetAppSettingsRequest, SetClipDataRequest,
     SetClipNameRequest, SetColumnSettingsRequest, SetColumnTrackRequest,
-    SetCustomInstanceDataRequest, SetInstanceSettingsRequest, SetMatrixPanRequest,
-    SetMatrixPlayRateRequest, SetMatrixSettingsRequest, SetMatrixTempoRequest,
+    SetCustomInstanceDataRequest, SetInstanceSettingsRequest, SetMatrixClickChannelRequest,
+    SetMatrixPanRequest, SetMatrixPlayRateRequest, SetMatrixSettingsRequest, SetMatrixTempoRequest,
     SetMatrixTimeSignatureRequest, SetMatrixVolumeRequest, SetPlaytimeEngineSettingsRequest,
     SetRowDataRequest, SetSequenceInfoRequest, SetTrackColorRequest,
     SetTrackInputMonitoringRequest, SetTrackInputRequest, SetTrackNameRequest, SetTrackPanRequest,
@@ -523,6 +523,21 @@ impl ProtoRequestHandler {
         #[cfg(feature = "playtime")]
         {
             PlaytimeProtoRequestHandler.set_matrix_pan(req)
+        }
+    }
+
+    pub fn set_matrix_click_channel(
+        &self,
+        req: SetMatrixClickChannelRequest,
+    ) -> Result<Response<Empty>, Status> {
+        #[cfg(not(feature = "playtime"))]
+        {
+            let _ = req;
+            playtime_not_available()
+        }
+        #[cfg(feature = "playtime")]
+        {
+            PlaytimeProtoRequestHandler.set_matrix_click_channel(req)
         }
     }
 

@@ -98,6 +98,9 @@ pub struct Matrix {
     pub activate_slot_on_trigger: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub click_volume: Option<Db>,
+    /// Metronome output channel.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub click_channel: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pre_roll_bars: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -142,6 +145,7 @@ impl Default for Matrix {
             common_tempo_range: Default::default(),
             activate_slot_on_trigger: ACTIVATE_SLOT_ON_TRIGGER_DEFAULT,
             click_volume: None,
+            click_channel: None,
             pre_roll_bars: None,
             color_palette: None,
             content_quantization_settings: Default::default(),

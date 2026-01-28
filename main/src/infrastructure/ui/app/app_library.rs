@@ -630,6 +630,9 @@ fn process_command(
         SetMatrixVolume(req) => {
             handler.set_matrix_volume(req)?;
         }
+        SetMatrixClickChannel(req) => {
+            handler.set_matrix_click_channel(req)?;
+        }
         SetMatrixPan(req) => {
             handler.set_matrix_pan(req)?;
         }

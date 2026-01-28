@@ -89,6 +89,10 @@ impl occasional_matrix_update::Update {
         Self::ClickVolume(matrix.click_volume().get())
     }
 
+    pub fn click_channel(matrix: &Matrix) -> Self {
+        Self::ClickChannel(matrix.click_channel())
+    }
+
     pub fn tempo_tap_volume(matrix: &Matrix) -> Self {
         Self::TempoTapVolume(matrix.tempo_tap_volume().get())
     }

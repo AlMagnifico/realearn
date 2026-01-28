@@ -13,15 +13,15 @@ use crate::infrastructure::proto::{
     GetClipDetailRequest, GetProjectDirReply, GetProjectDirRequest, ImportFilesRequest,
     InsertColumnsRequest, MatrixVolumeKind, OpenTrackFxRequest, ProveAuthenticityReply,
     ProveAuthenticityRequest, SetClipDataRequest, SetClipNameRequest, SetColumnSettingsRequest,
-    SetColumnTrackRequest, SetMatrixPanRequest, SetMatrixPlayRateRequest, SetMatrixSettingsRequest,
-    SetMatrixTempoRequest, SetMatrixTimeSignatureRequest, SetMatrixVolumeRequest,
-    SetPlaytimeEngineSettingsRequest, SetRowDataRequest, SetSequenceInfoRequest,
-    SetTrackColorRequest, SetTrackInputMonitoringRequest, SetTrackInputRequest,
-    SetTrackNameRequest, SetTrackPanRequest, SetTrackVolumeRequest, TriggerClipAction,
-    TriggerClipRequest, TriggerColumnAction, TriggerColumnRequest, TriggerMatrixAction,
-    TriggerMatrixRequest, TriggerRowAction, TriggerRowRequest, TriggerSequenceAction,
-    TriggerSequenceRequest, TriggerSlotAction, TriggerSlotRequest, TriggerTrackAction,
-    TriggerTrackRequest,
+    SetColumnTrackRequest, SetMatrixClickChannelRequest, SetMatrixPanRequest,
+    SetMatrixPlayRateRequest, SetMatrixSettingsRequest, SetMatrixTempoRequest,
+    SetMatrixTimeSignatureRequest, SetMatrixVolumeRequest, SetPlaytimeEngineSettingsRequest,
+    SetRowDataRequest, SetSequenceInfoRequest, SetTrackColorRequest,
+    SetTrackInputMonitoringRequest, SetTrackInputRequest, SetTrackNameRequest, SetTrackPanRequest,
+    SetTrackVolumeRequest, TriggerClipAction, TriggerClipRequest, TriggerColumnAction,
+    TriggerColumnRequest, TriggerMatrixAction, TriggerMatrixRequest, TriggerRowAction,
+    TriggerRowRequest, TriggerSequenceAction, TriggerSequenceRequest, TriggerSlotAction,
+    TriggerSlotRequest, TriggerTrackAction, TriggerTrackRequest,
 };
 use base::future_util;
 use base::tracing_util::ok_or_log_as_warn;
@@ -611,6 +611,16 @@ impl PlaytimeProtoRequestHandler {
             project
                 .master_track()?
                 .set_pan_smart(pan, TrackSetSmartOpts::default())?;
+            Ok(())
+        })
+    }
+
+    pub fn set_matrix_click_channel(
+        &self,
+        req: SetMatrixClickChannelRequest,
+    ) -> Result<Response<Empty>, Status> {
+        self.handle_matrix_command(req.matrix_id, |matrix| {
+            matrix.set_click_channel(req.channel);
             Ok(())
         })
     }

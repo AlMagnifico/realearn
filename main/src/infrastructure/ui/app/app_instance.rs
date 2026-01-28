@@ -401,9 +401,19 @@ impl CommonAppRunningState {
 }
 
 fn send_to_app(app_callback: AppCallback, reply: &Reply) {
-    let vec = reply.encode_to_vec();
-    let length = vec.len();
-    let boxed_slice = vec.into_boxed_slice();
+    let bytes = reply.encode_to_vec();
+    // if Reaper::get().is_in_main_thread() {
+    //     BackboneShell::get().spawn_in_async_runtime(async move {
+    //         send_to_app_internal(app_callback, bytes);
+    //     });
+    // } else {
+    send_to_app_internal(app_callback, bytes);
+    // }
+}
+
+fn send_to_app_internal(app_callback: AppCallback, bytes: Vec<u8>) {
+    let length = bytes.len();
+    let boxed_slice = bytes.into_boxed_slice();
     // The app side is responsible for freeing the memory!
     // We really need to pass owned data to the app because it's written in Dart and Dart code
     // doesn't execute on the same thread. It will execute the code asynchronously in another

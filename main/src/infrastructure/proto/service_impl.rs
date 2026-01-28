@@ -25,9 +25,10 @@ use crate::infrastructure::proto::{
     ProveAuthenticityRequest, SaveControllerRequest, SaveCustomCompartmentDataRequest,
     SetAppSettingsRequest, SetClipDataRequest, SetClipNameRequest, SetColumnSettingsRequest,
     SetColumnTrackRequest, SetCustomInstanceDataRequest, SetInstanceSettingsRequest,
-    SetMatrixPanRequest, SetMatrixPlayRateRequest, SetMatrixSettingsRequest, SetMatrixTempoRequest,
-    SetMatrixTimeSignatureRequest, SetMatrixVolumeRequest, SetPlaytimeEngineSettingsRequest,
-    SetRowDataRequest, SetTrackColorRequest, SetTrackInputMonitoringRequest, SetTrackInputRequest,
+    SetMatrixClickChannelRequest, SetMatrixPanRequest, SetMatrixPlayRateRequest,
+    SetMatrixSettingsRequest, SetMatrixTempoRequest, SetMatrixTimeSignatureRequest,
+    SetMatrixVolumeRequest, SetPlaytimeEngineSettingsRequest, SetRowDataRequest,
+    SetTrackColorRequest, SetTrackInputMonitoringRequest, SetTrackInputRequest,
     SetTrackNameRequest, SetTrackPanRequest, SetTrackVolumeRequest, TriggerClipRequest,
     TriggerColumnRequest, TriggerGlobalRequest, TriggerInstanceRequest, TriggerMatrixRequest,
     TriggerRowRequest, TriggerSlotRequest, TriggerTrackRequest,
@@ -577,6 +578,14 @@ impl helgobox_service_server::HelgoboxService for HelgoboxServiceImpl {
         request: Request<SetMatrixPanRequest>,
     ) -> Result<Response<Empty>, Status> {
         self.command_handler.set_matrix_pan(request.into_inner())
+    }
+
+    async fn set_matrix_click_channel(
+        &self,
+        request: Request<SetMatrixClickChannelRequest>,
+    ) -> Result<Response<Empty>, Status> {
+        self.command_handler
+            .set_matrix_click_channel(request.into_inner())
     }
 
     async fn set_track_volume(

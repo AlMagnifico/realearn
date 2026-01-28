@@ -341,6 +341,9 @@ mod playtime_impl {
                     ClipMatrixEvent::ClickVolumeChanged => Some(OccasionalMatrixUpdate {
                         update: Some(occasional_matrix_update::Update::click_volume(matrix)),
                     }),
+                    ClipMatrixEvent::ClickChannelChanged => Some(OccasionalMatrixUpdate {
+                        update: Some(occasional_matrix_update::Update::click_channel(matrix)),
+                    }),
                     ClipMatrixEvent::TempoTapVolumeChanged => Some(OccasionalMatrixUpdate {
                         update: Some(occasional_matrix_update::Update::tempo_tap_volume(matrix)),
                     }),
