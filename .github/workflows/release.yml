@@ -37,7 +37,7 @@ jobs:
             extension_file_name_dst: reaper_helgobox-windows-i686.dll
 
           - artifact: macos-x86_64
-            os: macos-13
+            os: macos-14
             lib_file_name: libhelgobox.dylib
             extension_file_name: libreaper_helgobox.dylib
             target: x86_64-apple-darwin

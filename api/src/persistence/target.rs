@@ -1377,7 +1377,13 @@ impl PotFilterKind {
         use PotFilterKind as K;
         matches!(
             self,
-            K::Database | K::IsAvailable | K::IsSupported | K::IsUser | K::ProductKind | K::IsFavorite | K::HasPreview
+            K::Database
+                | K::IsAvailable
+                | K::IsSupported
+                | K::IsUser
+                | K::ProductKind
+                | K::IsFavorite
+                | K::HasPreview
         )
     }
 
@@ -1390,7 +1396,12 @@ impl PotFilterKind {
     pub fn dependency_position(&self) -> u32 {
         use PotFilterKind as K;
         match self {
-            K::Database | K::IsAvailable | K::IsSupported | K::IsUser | K::ProductKind | K::IsFavorite => 0,
+            K::Database
+            | K::IsAvailable
+            | K::IsSupported
+            | K::IsUser
+            | K::ProductKind
+            | K::IsFavorite => 0,
             K::Project => 1,
             K::Bank => 2,
             K::SubBank => 3,
