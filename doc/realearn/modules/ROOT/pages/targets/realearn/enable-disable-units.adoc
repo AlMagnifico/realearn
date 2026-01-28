@@ -1,0 +1,27 @@
+= Target "ReaLearn: Enable/disable units"
+
+This target allows you to flexibly enable or disable other ReaLearn units within the same ReaLearn instance.
+
+== Exclusivity menu
+
+Non-exclusive:: If the incoming control value is greater than 0%, all matching ReaLearn units will be enabled (on top of the already enabled units).
+If the value is 0%, all matching ReaLearn units will be disabled.
+
+Exclusive:: If the incoming control value is greater than 0%, all matching ReaLearn units will be enabled and all non-matching ones will be disabled.
+If the value is 0%, it's exactly the opposite (react to button xref:user-interface/mapping-panel/glue-section.adoc#press-only[press only] if you don't want this to happen).
+
+Exclusive (on only):: Variation of _Exclusive_ that applies exclusivity only if the incoming control value is greater than 0%.
+
+== Tags field
+
+Here you enter the unit tags, separated by commas.
+
+.Comma-separated tags
+====
+keys, guit, voc
+====
+
+== Remarks
+
+* This affects other ReaLearn units only. It doesn't match against this one.
+* ReaLearn units without tags won't be affected at all.

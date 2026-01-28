@@ -2,6 +2,10 @@
 
 image:realearn/screenshots/main-panel-bottom.png[Screenshot]
 
+== Unit enabled/disabled checkbox
+
+This checkbox lets you enable or disable the currently displayed unit. You can even do this dynamically by using the xref:targets/realearn/enable-disable-units.adoc[].
+
 == Unit menu
 
 Press the button will reveal a menu with the following actions to manage xref:key-concepts.adoc#unit[Units]:

@@ -1,5 +1,12 @@
 = Instance concepts
 
+[[instance-tag]]
+== Instance tag
+
+Each instance can have arbitrarily many tags.
+
+Tags are important if you want to dynamically enable or disable instances using the xref:targets/realearn/enable-disable-instances.adoc[].
+
 [[auto-units]]
 == Auto units
 

@@ -107,7 +107,7 @@ The unit FX can be changed via xref:targets/fx/fx.adoc[].
 
 Each unit can have arbitrarily many tags.
 
-Tags are important if you want to dynamically enable or disable instances using the xref:targets/realearn/enable-disable-instances.adoc[].
+Tags are important if you want to dynamically enable or disable units using the xref:targets/realearn/enable-disable-units.adoc[].
 
 [[projection]]
 == Projection
