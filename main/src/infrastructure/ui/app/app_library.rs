@@ -9,6 +9,7 @@ use crate::infrastructure::ui::{AppCallback, SharedAppInstance};
 use anyhow::{anyhow, bail, Context, Result};
 use base::Global;
 use libloading::{Library, Symbol};
+use std::cell::Cell;
 
 use crate::domain::InstanceId;
 #[cfg(feature = "playtime")]
@@ -25,6 +26,7 @@ use std::path::{Path, PathBuf};
 use std::ptr::{null_mut, NonNull};
 use swell_ui::Window;
 use tonic::Status;
+use tracing::debug;
 
 #[derive(Debug)]
 pub struct AppLibrary {
@@ -253,9 +255,6 @@ extern "C" fn invoke_host(data: *const u8, length: i32) {
 
 /// Processes the given request.
 ///
-/// Essentially this only extracts some values and then schedules the actual work on the main
-/// thread.
-///
 /// # Errors
 ///
 /// Returns an error if something in the synchronous part of the request processing went wrong.
@@ -380,7 +379,7 @@ fn prepare_app_start() {
     }
 }
 
-/// Executes the given command asynchronously (in the main thread).
+/// Executes the given command in the main thread.
 ///
 /// # Errors
 ///
@@ -389,8 +388,8 @@ fn process_command_request(
     instance_id: InstanceId,
     value: proto::command_request::Value,
 ) -> Result<()> {
-    // We need to execute commands on the main thread!
-    Global::task_support().do_in_main_thread_asap(move || {
+    // The handler to execute for this command
+    let handler = move || {
         // Execute command
         let result = process_command(instance_id, value);
         // Handle possible error
@@ -401,11 +400,36 @@ fn process_command_request(
             let _ = send_to_app(
                 instance_id,
                 reply::Value::EventReply(EventReply {
-                    value: Some(event_reply::Value::ErrorMessage(status.message().to_string())),
+                    value: Some(event_reply::Value::ErrorMessage(
+                        status.message().to_string(),
+                    )),
                 }),
             );
         }
-    }).map_err(|e| anyhow!(e))?;
+    };
+    if Reaper::get().is_in_main_thread() {
+        debug!("Handle Dart command coming from main thread");
+        // We are already in the main thread! Since Helgobox 2.18.3-pre.2 this is the default!
+        // Because the app associated with this version was updated to Flutter 3.38.8 (previously 3.29.3)
+        // and therefore is affected by the "Great thread merge".
+        // (https://docs.flutter.dev/release/breaking-changes/macos-windows-merged-threads and https://www.youtube.com/watch?v=miW7vCmQwnw&vl=de)
+        // It's quite nice that we are called from the main thread now! But it's important to
+        // consider that we must never call back into Dart from the same callstack! That's why we
+        // do the thread-local stuff here.
+        CALLED_FROM_DART.set(true);
+        scopeguard::defer! {
+            CALLED_FROM_DART.set(false);
+        }
+        handler();
+    } else {
+        debug!("Handle Dart command coming from non-main thread");
+        // We are being called from another thread, not the main thread! This was most of the time the case
+        // in previous Helgobox versions and should almost never happen nowadays. Since most command handlers
+        // necessarily need to execute in the main thread, we schedule the handler fo execution on the main thread!
+        Global::task_support()
+            .do_later_in_main_thread_asap(handler)
+            .map_err(|e| anyhow!(e))?;
+    }
     Ok(())
 }
 
@@ -812,4 +836,20 @@ pub const MIN_APP_API_VERSION: Version = Version::new(16, 0, 0);
 #[cfg(not(feature = "playtime"))]
 fn playtime_not_available() -> Result<(), Status> {
     Err(Status::not_found("Playtime feature not available"))
+}
+
+/// Returns whether we are currently being called from Dart (= the app).
+///
+/// ## Background
+///
+/// If we want to send something to the app (= invoke the native Dart callback), we MUST NOT do
+/// it while we are being called from Dart (not in the same callstack)!!!
+/// That's forbidden by the Dart VM and will lead to immediate abort. Instead, we must **defer**
+/// the execution of that callback - it can be any thread! Just another callstack.
+pub fn called_from_dart() -> bool {
+    CALLED_FROM_DART.get()
+}
+
+thread_local! {
+    static CALLED_FROM_DART: Cell<bool> = const { Cell::new(false) };
 }

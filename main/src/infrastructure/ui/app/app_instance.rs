@@ -5,7 +5,7 @@ use crate::infrastructure::proto::{
     OccasionalGlobalUpdate, ProtoReceivers, Reply,
 };
 use crate::infrastructure::ui::util::open_in_browser;
-use crate::infrastructure::ui::AppHandle;
+use crate::infrastructure::ui::{called_from_dart, AppHandle};
 use anyhow::{anyhow, bail, Context, Result};
 use base::hash_util::NonCryptoHashMap;
 use fragile::Fragile;
@@ -402,13 +402,14 @@ impl CommonAppRunningState {
 
 fn send_to_app(app_callback: AppCallback, reply: &Reply) {
     let bytes = reply.encode_to_vec();
-    // if Reaper::get().is_in_main_thread() {
-    //     BackboneShell::get().spawn_in_async_runtime(async move {
-    //         send_to_app_internal(app_callback, bytes);
-    //     });
-    // } else {
-    send_to_app_internal(app_callback, bytes);
-    // }
+    if called_from_dart() {
+        // We must never call back into Dart if we are being called by Dart!
+        BackboneShell::get().spawn_in_async_runtime(async move {
+            send_to_app_internal(app_callback, bytes);
+        });
+    } else {
+        send_to_app_internal(app_callback, bytes);
+    }
 }
 
 fn send_to_app_internal(app_callback: AppCallback, bytes: Vec<u8>) {
